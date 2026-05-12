@@ -1,0 +1,133 @@
+/* ===== SPACE LINK REAL ESTATE CRM — DESIGN SYSTEM ===== */
+
+:root {
+  /* Primary Colors - Deep Navy */
+  --color-primary-900: #060d17;
+  --color-primary-800: #0a1220;
+  --color-primary-700: #0f1b2d;
+  --color-primary-600: #152438;
+  --color-primary-500: #1e2d45;
+  --color-primary-400: #2a3f5f;
+  --color-primary-300: #3a5580;
+  --color-primary-200: #5a7aa8;
+  --color-primary-100: #8ba4c8;
+
+  /* Accent Colors - Gold/Amber */
+  --color-accent-900: #6b5520;
+  --color-accent-800: #8a6e2a;
+  --color-accent-700: #a88735;
+  --color-accent-600: #b89840;
+  --color-accent-500: #c8a44e;
+  --color-accent-400: #d4b76a;
+  --color-accent-300: #e0ca8a;
+  --color-accent-200: #ecdcab;
+  --color-accent-100: #f5edcd;
+
+  /* Semantic Colors */
+  --color-success: #22c55e;
+  --color-success-bg: rgba(34, 197, 94, 0.12);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.12);
+  --color-danger: #ef4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.12);
+  --color-info: #3b82f6;
+  --color-info-bg: rgba(59, 130, 246, 0.12);
+
+  /* Status Colors */
+  --status-new: #3b82f6;
+  --status-contacted: #8b5cf6;
+  --status-visit-scheduled: #f59e0b;
+  --status-visited: #06b6d4;
+  --status-interested: #22c55e;
+  --status-negotiation: #f97316;
+  --status-closed-won: #10b981;
+  --status-closed-lost: #ef4444;
+  --status-followup: #ec4899;
+
+  /* Neutral Colors */
+  --color-bg: #0a1220;
+  --color-bg-elevated: #0f1b2d;
+  --color-bg-card: #152438;
+  --color-bg-hover: #1e2d45;
+  --color-bg-input: #0d1825;
+  --color-border: rgba(200, 164, 78, 0.15);
+  --color-border-strong: rgba(200, 164, 78, 0.3);
+  --color-text-primary: #f0f2f5;
+  --color-text-secondary: #8ba4c8;
+  --color-text-muted: #5a7aa8;
+  --color-text-inverse: #0a1220;
+
+  /* Surface Colors (Glassmorphism) */
+  --glass-bg: rgba(15, 27, 45, 0.7);
+  --glass-border: rgba(200, 164, 78, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-display: 'Outfit', 'Inter', sans-serif;
+
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-base: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(200, 164, 78, 0.15);
+  --shadow-glow-strong: 0 0 40px rgba(200, 164, 78, 0.25);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Layout */
+  --sidebar-width: 260px;
+  --sidebar-collapsed: 72px;
+  --header-height: 64px;
+  --max-content-width: 1400px;
+
+  /* Z-index */
+  --z-sidebar: 100;
+  --z-header: 110;
+  --z-modal-overlay: 200;
+  --z-modal: 210;
+  --z-toast: 300;
+}
