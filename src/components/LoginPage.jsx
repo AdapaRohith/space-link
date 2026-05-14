@@ -27,8 +27,8 @@ export default function LoginPage({ onLogin }) {
   };
 
   const demoAccounts = [
-    { label: 'Admin', email: 'rajesh@spacelink.in', pass: 'admin123' },
-    { label: 'Sales', email: 'priya@spacelink.in', pass: 'sales123' },
+    { label: 'Admin', email: 'karuna@spacelink.in', pass: 'admin123' },
+    { label: 'Sales', email: 'sales@spacelink.in', pass: 'sales123' },
   ];
 
   return (

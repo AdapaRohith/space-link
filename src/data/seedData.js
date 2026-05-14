@@ -3,19 +3,19 @@
 export const DEFAULT_USERS = [
   {
     id: 'user_admin',
-    name: 'Rajesh Kumar',
+    name: 'KarunaKumar',
     role: 'admin',
     phone: '9876543210',
-    email: 'rajesh@spacelink.in',
+    email: 'karuna@spacelink.in',
     password_hash: 'admin123',
     active: true,
   },
   {
     id: 'user_sales1',
-    name: 'Priya Sharma',
+    name: 'Sales Team',
     role: 'sales',
     phone: '9876543211',
-    email: 'priya@spacelink.in',
+    email: 'sales@spacelink.in',
     password_hash: 'sales123',
     active: true,
   },

@@ -2,8 +2,8 @@
 
 -- Users
 INSERT INTO users (id, name, role, phone, email, password_hash, active) VALUES
-  ('user_admin',     'Rajesh Kumar',   'admin',        '9876543210', 'rajesh@spacelink.in',  'admin123', TRUE),
-  ('user_sales1',    'Priya Sharma',   'sales',        '9876543211', 'priya@spacelink.in',   'sales123', TRUE),
+  ('user_admin',     'KarunaKumar',    'admin',        '9876543210', 'karuna@spacelink.in',  'admin123', TRUE),
+  ('user_sales1',    'Sales Team',     'sales',        '9876543211', 'sales@spacelink.in',   'sales123', TRUE),
   ('user_sales2',    'Amit Patel',     'sales',        '9876543212', 'amit@spacelink.in',    'sales123', TRUE),
   ('user_sales3',    'Kavitha Reddy',  'sales',        '9876543215', 'kavitha@spacelink.in', 'sales123', TRUE),
   ('user_reception', 'Meena Desai',    'receptionist', '9876543213', 'meena@spacelink.in',   'front123', TRUE)
