@@ -52,18 +52,24 @@ export default function LeadDetail() {
   }, [id]);
 
   const loadData = async () => {
-    const [usrs, srcs] = await Promise.all([getAllUsers(), getAllSources()]);
-    setUsers(usrs);
+    setUsers(getAllUsers());
+    
+    let srcs = [];
+    try { srcs = await getAllSources(); } catch {}
     setSources(srcs);
 
-    const l = await getLeadById(id);
-    if (!l) { navigate('/leads'); return; }
-    setLead(l);
-    setEditForm({ ...l });
+    try {
+      const l = await getLeadById(id);
+      if (!l) { navigate('/leads'); return; }
+      setLead(l);
+      setEditForm({ ...l });
 
-    const [v, a] = await Promise.all([getVisitsByLead(id), getActivitiesByLead(id)]);
-    setVisits(v);
-    setActivities(a);
+      const [v, a] = await Promise.all([getVisitsByLead(id), getActivitiesByLead(id)]);
+      setVisits(v);
+      setActivities(a);
+    } catch {
+      navigate('/leads');
+    }
   };
 
   const handleStatusUpdate = async () => {

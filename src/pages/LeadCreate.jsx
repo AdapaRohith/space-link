@@ -20,9 +20,13 @@ export default function LeadCreate() {
 
   useEffect(() => {
     async function load() {
-      const [srcs, usrs] = await Promise.all([getAllSources(), getAllUsers()]);
-      setSources(srcs);
-      setUsers(usrs);
+      setUsers(getAllUsers());
+      try {
+        const srcs = await getAllSources();
+        setSources(srcs);
+      } catch {
+        setSources([]);
+      }
     }
     load();
   }, []);

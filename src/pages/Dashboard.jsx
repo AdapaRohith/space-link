@@ -23,18 +23,27 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const [statsData, todayLeads, acts, srcs, users] = await Promise.all([
-        getLeadStats(),
-        getTodayLeads(),
-        getRecentActivities(10),
-        getAllSources(),
-        getAllUsers(),
-      ]);
-      setStats(statsData);
-      setRecentLeads(todayLeads.slice(0, 8));
-      setActivities(acts);
-      setSources(srcs);
+      // Users are hardcoded (synchronous)
+      const users = getAllUsers();
       setUsersCache(users);
+
+      try {
+        const [statsData, todayLeads, acts, srcs] = await Promise.all([
+          getLeadStats(),
+          getTodayLeads(),
+          getRecentActivities(10),
+          getAllSources(),
+        ]);
+        setStats(statsData);
+        setRecentLeads(todayLeads.slice(0, 8));
+        setActivities(acts);
+        setSources(srcs);
+      } catch {
+        setStats({ total: 0, todayWalkIns: 0, followUpsDue: 0, newToday: 0, byStatus: {}, bySource: {}, byAssignee: {} });
+        setRecentLeads([]);
+        setActivities([]);
+        setSources([]);
+      }
     }
     load();
   }, []);

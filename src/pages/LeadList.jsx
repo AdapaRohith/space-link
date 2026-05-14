@@ -32,9 +32,13 @@ export default function LeadList() {
   // Load reference data once
   useEffect(() => {
     async function loadRef() {
-      const [srcs, usrs] = await Promise.all([getAllSources(), getAllUsers()]);
-      setSources(srcs);
-      setUsers(usrs);
+      setUsers(getAllUsers());
+      try {
+        const srcs = await getAllSources();
+        setSources(srcs);
+      } catch {
+        setSources([]);
+      }
     }
     loadRef();
   }, []);
@@ -44,18 +48,22 @@ export default function LeadList() {
     let cancelled = false;
     async function loadLeads() {
       setLoading(true);
-      const data = await filterLeads({
-        search,
-        source_id: sourceFilter,
-        status: statusFilter,
-        assigned_to: assigneeFilter,
-        date_from: dateFrom,
-        date_to: dateTo,
-      });
-      if (!cancelled) {
-        setLeads(data);
-        setLoading(false);
+      try {
+        const data = await filterLeads({
+          search,
+          source_id: sourceFilter,
+          status: statusFilter,
+          assigned_to: assigneeFilter,
+          date_from: dateFrom,
+          date_to: dateTo,
+        });
+        if (!cancelled) {
+          setLeads(data);
+        }
+      } catch {
+        if (!cancelled) setLeads([]);
       }
+      if (!cancelled) setLoading(false);
     }
     // Debounce search
     const timer = setTimeout(loadLeads, search ? 300 : 0);

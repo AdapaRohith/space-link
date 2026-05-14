@@ -22,12 +22,13 @@ export default function UserManagement() {
   useEffect(() => { loadUsers(); }, []);
 
   const loadUsers = async () => {
-    const [usrs, counts] = await Promise.all([
-      getAllUsersIncludingInactive(),
-      apiGet('/leads/counts-by-assignee'),
-    ]);
-    setUsers(usrs);
-    setLeadCounts(counts);
+    setUsers(getAllUsersIncludingInactive());
+    try {
+      const counts = await apiGet('/leads/counts-by-assignee');
+      setLeadCounts(counts);
+    } catch {
+      setLeadCounts({});
+    }
   };
 
   const set = (field, value) => {

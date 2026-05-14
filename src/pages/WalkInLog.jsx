@@ -27,29 +27,33 @@ export default function WalkInLog() {
   });
   const [errors, setErrors] = useState({});
 
-  // Load users once
+  // Load users once (synchronous — hardcoded)
   useEffect(() => {
-    getAllUsers().then(setUsers);
+    setUsers(getAllUsers());
   }, []);
 
   // Load walk-ins when filters change
   useEffect(() => {
     async function loadWalkins() {
       setLoading(true);
-      const allWalkins = await filterLeads({ source_id: 'src_walkin' });
-      const filtered = allWalkins
-        .filter(l => {
-          const localDate = new Date(l.created_at);
-          const dateStr = localDate.getFullYear() + '-' +
-            String(localDate.getMonth() + 1).padStart(2, '0') + '-' +
-            String(localDate.getDate()).padStart(2, '0');
-          return dateStr === dateFilter;
-        })
-        .filter(l => !search ||
-          l.lead_name.toLowerCase().includes(search.toLowerCase()) ||
-          l.phone.includes(search)
-        );
-      setWalkins(filtered);
+      try {
+        const allWalkins = await filterLeads({ source_id: 'src_walkin' });
+        const filtered = allWalkins
+          .filter(l => {
+            const localDate = new Date(l.created_at);
+            const dateStr = localDate.getFullYear() + '-' +
+              String(localDate.getMonth() + 1).padStart(2, '0') + '-' +
+              String(localDate.getDate()).padStart(2, '0');
+            return dateStr === dateFilter;
+          })
+          .filter(l => !search ||
+            l.lead_name.toLowerCase().includes(search.toLowerCase()) ||
+            l.phone.includes(search)
+          );
+        setWalkins(filtered);
+      } catch {
+        setWalkins([]);
+      }
       setLoading(false);
     }
     loadWalkins();
