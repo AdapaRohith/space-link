@@ -7,7 +7,7 @@ import { getSession, logout } from '../services/authService';
 import './Sidebar.css';
 
 const NAV_ITEMS = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'sales', 'receptionist'] },
+  { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
   { path: '/leads', label: 'All Leads', icon: ClipboardList, roles: ['admin', 'sales', 'receptionist'] },
   { path: '/leads/new', label: 'Add Lead', icon: UserPlus, roles: ['admin', 'sales', 'receptionist'] },
   { path: '/walkins', label: 'Walk-In Log', icon: Building2, roles: ['admin', 'sales', 'receptionist'] },

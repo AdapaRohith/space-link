@@ -14,9 +14,18 @@ function ProtectedRoute({ children, allowedRoles }) {
   const session = getSession();
   if (!session) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(session.role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/leads" replace />;
   }
   return children;
+}
+
+function DefaultRedirect() {
+  const session = getSession();
+  // Admin goes to Dashboard, everyone else goes to Leads
+  if (session?.role === 'admin') {
+    return <Dashboard />;
+  }
+  return <Navigate to="/leads" replace />;
 }
 
 export default function App() {
@@ -36,7 +45,7 @@ export default function App() {
         <Route element={
           <ProtectedRoute><Layout /></ProtectedRoute>
         }>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<DefaultRedirect />} />
           <Route path="/leads" element={<LeadList />} />
           <Route path="/leads/new" element={<LeadCreate />} />
           <Route path="/leads/:id" element={<LeadDetail />} />
