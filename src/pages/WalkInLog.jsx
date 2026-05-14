@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2, Plus, Calendar, Clock, UserCheck, Search, X
@@ -6,7 +6,7 @@ import {
 import { filterLeads, createLead } from '../services/leadService';
 import { addVisit } from '../services/visitService';
 import { getAllUsers, getSession, getUserName } from '../services/authService';
-import { getSourceName } from '../services/sourceService';
+import { getSourceName, getAllSources } from '../services/sourceService';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import './WalkInLog.css';
@@ -14,10 +14,12 @@ import './WalkInLog.css';
 export default function WalkInLog() {
   const navigate = useNavigate();
   const session = getSession();
-  const users = getAllUsers();
+  const [users, setUsers] = useState([]);
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState('');
+  const [walkins, setWalkins] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
     lead_name: '', phone: '', email: '', assigned_to: '', attended_by: '',
@@ -25,19 +27,32 @@ export default function WalkInLog() {
   });
   const [errors, setErrors] = useState({});
 
-  const walkins = useMemo(() => {
-    return filterLeads({ source_id: 'src_walkin' })
-      .filter(l => {
-        const localDate = new Date(l.created_at);
-        const dateStr = localDate.getFullYear() + '-' +
-          String(localDate.getMonth() + 1).padStart(2, '0') + '-' +
-          String(localDate.getDate()).padStart(2, '0');
-        return dateStr === dateFilter;
-      })
-      .filter(l => !search ||
-        l.lead_name.toLowerCase().includes(search.toLowerCase()) ||
-        l.phone.includes(search)
-      );
+  // Load users once
+  useEffect(() => {
+    getAllUsers().then(setUsers);
+  }, []);
+
+  // Load walk-ins when filters change
+  useEffect(() => {
+    async function loadWalkins() {
+      setLoading(true);
+      const allWalkins = await filterLeads({ source_id: 'src_walkin' });
+      const filtered = allWalkins
+        .filter(l => {
+          const localDate = new Date(l.created_at);
+          const dateStr = localDate.getFullYear() + '-' +
+            String(localDate.getMonth() + 1).padStart(2, '0') + '-' +
+            String(localDate.getDate()).padStart(2, '0');
+          return dateStr === dateFilter;
+        })
+        .filter(l => !search ||
+          l.lead_name.toLowerCase().includes(search.toLowerCase()) ||
+          l.phone.includes(search)
+        );
+      setWalkins(filtered);
+      setLoading(false);
+    }
+    loadWalkins();
   }, [dateFilter, search]);
 
   const set = (field, value) => {
@@ -45,7 +60,7 @@ export default function WalkInLog() {
     if (errors[field]) setErrors(p => ({ ...p, [field]: '' }));
   };
 
-  const handleQuickAdd = () => {
+  const handleQuickAdd = async () => {
     const errs = {};
     if (!form.lead_name.trim()) errs.lead_name = 'Required';
     if (!form.phone.trim()) errs.phone = 'Required';
@@ -53,7 +68,7 @@ export default function WalkInLog() {
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
-    const lead = createLead({
+    const lead = await createLead({
       lead_name: form.lead_name.trim(),
       phone: form.phone,
       email: form.email,
@@ -62,7 +77,7 @@ export default function WalkInLog() {
       attended_by: form.attended_by || form.assigned_to,
     }, session.userId);
 
-    addVisit({
+    await addVisit({
       lead_id: lead.id,
       visit_date: dateFilter,
       visit_time: form.walkin_time,
@@ -75,6 +90,17 @@ export default function WalkInLog() {
       walkin_time: new Date().toTimeString().slice(0, 5), notes: '',
     });
     setShowModal(false);
+
+    // Reload walk-ins
+    const allWalkins = await filterLeads({ source_id: 'src_walkin' });
+    const filtered = allWalkins.filter(l => {
+      const localDate = new Date(l.created_at);
+      const dateStr = localDate.getFullYear() + '-' +
+        String(localDate.getMonth() + 1).padStart(2, '0') + '-' +
+        String(localDate.getDate()).padStart(2, '0');
+      return dateStr === dateFilter;
+    });
+    setWalkins(filtered);
   };
 
   return (
@@ -126,7 +152,7 @@ export default function WalkInLog() {
               </div>
               <div className="walkin-meta">
                 <span><Clock size={12} /> {new Date(lead.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
-                <span><UserCheck size={12} /> {getUserName(lead.assigned_to)}</span>
+                <span><UserCheck size={12} /> {getUserName(lead.assigned_to, users)}</span>
               </div>
               {lead.notes && (
                 <p className="walkin-notes">{lead.notes}</p>

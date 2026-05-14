@@ -3,14 +3,15 @@ import {
   Users, Plus, Edit3, Shield, Phone, Mail, UserCheck,
   UserX, ChevronDown, Save
 } from 'lucide-react';
-import { getAllUsers, addUser, updateUser, toggleUserActive, getSession } from '../services/authService';
-import { getCollection } from '../services/storage';
+import { getAllUsersIncludingInactive, addUser, updateUser, toggleUserActive, getSession } from '../services/authService';
+import { apiGet } from '../services/storage';
 import Modal from '../components/Modal';
 import './UserManagement.css';
 
 export default function UserManagement() {
   const session = getSession();
   const [users, setUsers] = useState([]);
+  const [leadCounts, setLeadCounts] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({
@@ -20,8 +21,13 @@ export default function UserManagement() {
 
   useEffect(() => { loadUsers(); }, []);
 
-  const loadUsers = () => {
-    setUsers(getCollection('crm_users'));
+  const loadUsers = async () => {
+    const [usrs, counts] = await Promise.all([
+      getAllUsersIncludingInactive(),
+      apiGet('/leads/counts-by-assignee'),
+    ]);
+    setUsers(usrs);
+    setLeadCounts(counts);
   };
 
   const set = (field, value) => {
@@ -46,7 +52,7 @@ export default function UserManagement() {
     setShowModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errs = {};
     if (!form.name.trim()) errs.name = 'Required';
     if (!form.email.trim()) errs.email = 'Required';
@@ -57,18 +63,18 @@ export default function UserManagement() {
     if (editingUser) {
       const updates = { name: form.name, email: form.email, phone: form.phone, role: form.role };
       if (form.password_hash) updates.password_hash = form.password_hash;
-      updateUser(editingUser.id, updates);
+      await updateUser(editingUser.id, updates);
     } else {
-      addUser(form);
+      await addUser(form);
     }
     setShowModal(false);
-    loadUsers();
+    await loadUsers();
   };
 
-  const handleToggle = (userId) => {
+  const handleToggle = async (userId) => {
     if (userId === session.userId) return;
-    toggleUserActive(userId);
-    loadUsers();
+    await toggleUserActive(userId);
+    await loadUsers();
   };
 
   const roleColors = {
@@ -78,13 +84,6 @@ export default function UserManagement() {
   };
 
   const roleLabels = { admin: 'Admin', sales: 'Sales Executive', receptionist: 'Receptionist' };
-
-  // Count leads per user
-  const leads = getCollection('crm_leads');
-  const leadCounts = users.reduce((acc, u) => {
-    acc[u.id] = leads.filter(l => l.assigned_to === u.id).length;
-    return acc;
-  }, {});
 
   return (
     <div className="page">

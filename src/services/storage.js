@@ -1,80 +1,44 @@
-// ===== GENERIC LOCALSTORAGE CRUD SERVICE =====
+// ===== API HELPER — REPLACES LOCALSTORAGE CRUD =====
 
-export function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-}
+const API_BASE = '/api';
 
-export function getCollection(key) {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function setCollection(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
-}
-
-export function addItem(collectionKey, item) {
-  const collection = getCollection(collectionKey);
-  const newItem = {
-    ...item,
-    id: generateId(),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+async function request(path, options = {}) {
+  const url = `${API_BASE}${path}`;
+  const config = {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
   };
-  collection.push(newItem);
-  setCollection(collectionKey, collection);
-  return newItem;
-}
-
-export function updateItem(collectionKey, id, updates) {
-  const collection = getCollection(collectionKey);
-  const index = collection.findIndex(item => item.id === id);
-  if (index === -1) return null;
-  collection[index] = {
-    ...collection[index],
-    ...updates,
-    updated_at: new Date().toISOString(),
-  };
-  setCollection(collectionKey, collection);
-  return collection[index];
-}
-
-export function deleteItem(collectionKey, id) {
-  const collection = getCollection(collectionKey);
-  const filtered = collection.filter(item => item.id !== id);
-  setCollection(collectionKey, filtered);
-  return filtered.length < collection.length;
-}
-
-export function getItemById(collectionKey, id) {
-  const collection = getCollection(collectionKey);
-  return collection.find(item => item.id === id) || null;
-}
-
-export function queryItems(collectionKey, filterFn) {
-  const collection = getCollection(collectionKey);
-  return filterFn ? collection.filter(filterFn) : collection;
-}
-
-export function exportData() {
-  const keys = ['crm_leads', 'crm_visits', 'crm_activities', 'crm_sources', 'crm_users'];
-  const data = {};
-  keys.forEach(key => { data[key] = getCollection(key); });
-  return JSON.stringify(data, null, 2);
-}
-
-export function importData(jsonString) {
-  try {
-    const data = JSON.parse(jsonString);
-    Object.entries(data).forEach(([key, value]) => {
-      if (Array.isArray(value)) setCollection(key, value);
-    });
-    return true;
-  } catch {
-    return false;
+  if (config.body && typeof config.body === 'object') {
+    config.body = JSON.stringify(config.body);
   }
+  const res = await fetch(url, config);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Request failed');
+  }
+  return res.json();
+}
+
+export function api(path, options) {
+  return request(path, options);
+}
+
+export function apiGet(path) {
+  return request(path);
+}
+
+export function apiPost(path, body) {
+  return request(path, { method: 'POST', body });
+}
+
+export function apiPut(path, body) {
+  return request(path, { method: 'PUT', body });
+}
+
+export function apiPatch(path, body) {
+  return request(path, { method: 'PATCH', body });
+}
+
+export function apiDelete(path) {
+  return request(path, { method: 'DELETE' });
 }

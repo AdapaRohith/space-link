@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User, Phone, Mail, MapPin, Building2, DollarSign, Save,
@@ -14,8 +14,18 @@ import './LeadCreate.css';
 export default function LeadCreate() {
   const navigate = useNavigate();
   const session = getSession();
-  const sources = getAllSources();
-  const users = getAllUsers();
+
+  const [sources, setSources] = useState([]);
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    async function load() {
+      const [srcs, usrs] = await Promise.all([getAllSources(), getAllUsers()]);
+      setSources(srcs);
+      setUsers(usrs);
+    }
+    load();
+  }, []);
 
   const [form, setForm] = useState({
     lead_name: '', phone: '', alternate_phone: '', email: '',
@@ -41,9 +51,9 @@ export default function LeadCreate() {
   const isWalkIn = form.source_id === 'src_walkin';
   const isReference = form.source_id === 'src_reference';
 
-  const handlePhoneBlur = () => {
+  const handlePhoneBlur = async () => {
     if (form.phone.length >= 10) {
-      const dupes = checkDuplicate(form.phone, form.alternate_phone);
+      const dupes = await checkDuplicate(form.phone, form.alternate_phone);
       if (dupes.length > 0) {
         setDuplicates(dupes);
         setShowDuplicateWarning(true);
@@ -66,53 +76,56 @@ export default function LeadCreate() {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
     setSaving(true);
 
-    // Handle custom source
-    let sourceId = form.source_id;
-    if (showCustomSource && form.custom_source) {
-      const newSource = addCustomSource(form.custom_source);
-      sourceId = newSource.id;
-    }
+    try {
+      // Handle custom source
+      let sourceId = form.source_id;
+      if (showCustomSource && form.custom_source) {
+        const newSource = await addCustomSource(form.custom_source);
+        sourceId = newSource.id;
+      }
 
-    const leadData = {
-      lead_name: form.lead_name.trim(),
-      phone: form.phone.replace(/\D/g, ''),
-      alternate_phone: form.alternate_phone.replace(/\D/g, ''),
-      email: form.email.trim(),
-      source_id: sourceId,
-      custom_source: form.custom_source,
-      assigned_to: form.assigned_to,
-      attended_by: form.attended_by || '',
-      budget: form.budget,
-      preferred_location: form.preferred_location,
-      property_type: form.property_type,
-      bhk: form.bhk,
-      notes: form.notes,
-      referrer_name: form.referrer_name,
-      referrer_phone: form.referrer_phone,
-    };
+      const leadData = {
+        lead_name: form.lead_name.trim(),
+        phone: form.phone.replace(/\D/g, ''),
+        alternate_phone: form.alternate_phone.replace(/\D/g, ''),
+        email: form.email.trim(),
+        source_id: sourceId,
+        custom_source: form.custom_source,
+        assigned_to: form.assigned_to,
+        attended_by: form.attended_by || '',
+        budget: form.budget,
+        preferred_location: form.preferred_location,
+        property_type: form.property_type,
+        bhk: form.bhk,
+        notes: form.notes,
+        referrer_name: form.referrer_name,
+        referrer_phone: form.referrer_phone,
+      };
 
-    const newLead = createLead(leadData, session.userId);
+      const newLead = await createLead(leadData, session.userId);
 
-    // Add visit if provided
-    if (form.visit_date || isWalkIn) {
-      addVisit({
-        lead_id: newLead.id,
-        visit_date: form.visit_date || form.walkin_date,
-        visit_time: form.visit_time || form.walkin_time,
-        site_location: form.site_location || 'Level Up Tower - Main Site',
-        notes: form.visit_notes || (isWalkIn ? 'Walk-in visit' : ''),
-      }, session.userId);
-    }
+      // Add visit if provided
+      if (form.visit_date || isWalkIn) {
+        await addVisit({
+          lead_id: newLead.id,
+          visit_date: form.visit_date || form.walkin_date,
+          visit_time: form.visit_time || form.walkin_time,
+          site_location: form.site_location || 'Level Up Tower - Main Site',
+          notes: form.visit_notes || (isWalkIn ? 'Walk-in visit' : ''),
+        }, session.userId);
+      }
 
-    setTimeout(() => {
       navigate(`/leads/${newLead.id}`);
-    }, 300);
+    } catch (err) {
+      console.error('Failed to create lead:', err);
+      setSaving(false);
+    }
   };
 
   const handleSourceChange = (value) => {

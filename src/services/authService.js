@@ -1,23 +1,16 @@
-// ===== AUTH SERVICE =====
-import { getCollection } from './storage';
+// ===== AUTH SERVICE — API BACKED =====
+import { apiGet, apiPost, apiPut, apiPatch } from './storage';
 
 const SESSION_KEY = 'crm_session';
 
-export function login(email, password) {
-  const users = getCollection('crm_users');
-  const user = users.find(
-    u => u.email === email && u.password_hash === password && u.active
-  );
-  if (!user) return null;
-  const session = {
-    userId: user.id,
-    name: user.name,
-    role: user.role,
-    email: user.email,
-    loginAt: new Date().toISOString(),
-  };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  return session;
+export async function login(email, password) {
+  try {
+    const session = await apiPost('/auth/login', { email, password });
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return session;
+  } catch {
+    return null;
+  }
 }
 
 export function logout() {
@@ -33,24 +26,43 @@ export function getSession() {
   }
 }
 
-export function getCurrentUser() {
+export async function getCurrentUser() {
   const session = getSession();
   if (!session) return null;
-  const users = getCollection('crm_users');
-  return users.find(u => u.id === session.userId) || null;
+  try {
+    return await apiGet(`/users/${session.userId}`);
+  } catch {
+    return null;
+  }
 }
 
-export function getAllUsers() {
-  return getCollection('crm_users').filter(u => u.active);
+export async function getAllUsers() {
+  try {
+    return await apiGet('/users/active');
+  } catch {
+    return [];
+  }
 }
 
-export function getUserById(id) {
-  const users = getCollection('crm_users');
-  return users.find(u => u.id === id) || null;
+export async function getAllUsersIncludingInactive() {
+  try {
+    return await apiGet('/users');
+  } catch {
+    return [];
+  }
 }
 
-export function getUserName(id) {
-  const user = getUserById(id);
+export async function getUserById(id) {
+  try {
+    return await apiGet(`/users/${id}`);
+  } catch {
+    return null;
+  }
+}
+
+export function getUserName(id, usersCache) {
+  if (!usersCache) return id || 'Unknown';
+  const user = usersCache.find(u => u.id === id);
   return user ? user.name : 'Unknown';
 }
 
@@ -68,32 +80,14 @@ export function hasPermission(action) {
   return rolePerms.includes(action) || session.role === 'admin';
 }
 
-export function addUser(userData) {
-  const users = getCollection('crm_users');
-  const newUser = {
-    ...userData,
-    id: 'user_' + Date.now().toString(36),
-    active: true,
-  };
-  users.push(newUser);
-  localStorage.setItem('crm_users', JSON.stringify(users));
-  return newUser;
+export async function addUser(userData) {
+  return await apiPost('/users', userData);
 }
 
-export function updateUser(id, updates) {
-  const users = getCollection('crm_users');
-  const index = users.findIndex(u => u.id === id);
-  if (index === -1) return null;
-  users[index] = { ...users[index], ...updates };
-  localStorage.setItem('crm_users', JSON.stringify(users));
-  return users[index];
+export async function updateUser(id, updates) {
+  return await apiPut(`/users/${id}`, updates);
 }
 
-export function toggleUserActive(id) {
-  const users = getCollection('crm_users');
-  const index = users.findIndex(u => u.id === id);
-  if (index === -1) return null;
-  users[index].active = !users[index].active;
-  localStorage.setItem('crm_users', JSON.stringify(users));
-  return users[index];
+export async function toggleUserActive(id) {
+  return await apiPatch(`/users/${id}/toggle`);
 }

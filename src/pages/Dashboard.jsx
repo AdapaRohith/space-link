@@ -7,7 +7,7 @@ import {
 import { getLeadStats, getTodayLeads } from '../services/leadService';
 import { getRecentActivities } from '../services/activityService';
 import { getAllSources, getSourceName } from '../services/sourceService';
-import { getUserName, getSession } from '../services/authService';
+import { getSession, getAllUsers, getUserName } from '../services/authService';
 import StatusBadge from '../components/StatusBadge';
 import { LEAD_STATUSES } from '../data/seedData';
 import './Dashboard.css';
@@ -16,13 +16,27 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [recentLeads, setRecentLeads] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [usersCache, setUsersCache] = useState([]);
   const navigate = useNavigate();
   const session = getSession();
 
   useEffect(() => {
-    setStats(getLeadStats());
-    setRecentLeads(getTodayLeads().slice(0, 8));
-    setActivities(getRecentActivities(10));
+    async function load() {
+      const [statsData, todayLeads, acts, srcs, users] = await Promise.all([
+        getLeadStats(),
+        getTodayLeads(),
+        getRecentActivities(10),
+        getAllSources(),
+        getAllUsers(),
+      ]);
+      setStats(statsData);
+      setRecentLeads(todayLeads.slice(0, 8));
+      setActivities(acts);
+      setSources(srcs);
+      setUsersCache(users);
+    }
+    load();
   }, []);
 
   if (!stats) return null;
@@ -34,7 +48,6 @@ export default function Dashboard() {
     { label: 'New Today', value: stats.newToday, icon: TrendingUp, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
   ];
 
-  const sources = getAllSources();
   const sourceData = sources.map(s => ({
     name: s.source_name,
     count: stats.bySource[s.id] || 0,
@@ -118,9 +131,9 @@ export default function Dashboard() {
                     <tr key={lead.id} onClick={() => navigate(`/leads/${lead.id}`)}>
                       <td style={{ fontWeight: 600 }}>{lead.lead_name}</td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{lead.phone}</td>
-                      <td><span className="text-muted">{getSourceName(lead.source_id)}</span></td>
+                      <td><span className="text-muted">{getSourceName(lead.source_id, sources)}</span></td>
                       <td><StatusBadge status={lead.status} /></td>
-                      <td style={{ color: 'var(--color-text-secondary)' }}>{getUserName(lead.assigned_to)}</td>
+                      <td style={{ color: 'var(--color-text-secondary)' }}>{getUserName(lead.assigned_to, usersCache)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -188,7 +201,7 @@ export default function Dashboard() {
                   <div className="activity-feed-content">
                     <p>{act.description}</p>
                     <span className="activity-feed-time">
-                      <Clock size={10} /> {getUserName(act.performed_by)} • {formatTime(act.created_at)}
+                      <Clock size={10} /> {getUserName(act.performed_by, usersCache)} • {formatTime(act.created_at)}
                     </span>
                   </div>
                 </div>

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getSession } from './services/authService';
-import { seedDatabase } from './data/seedData';
 import LoginPage from './components/LoginPage';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -10,9 +9,6 @@ import LeadCreate from './pages/LeadCreate';
 import LeadDetail from './pages/LeadDetail';
 import WalkInLog from './pages/WalkInLog';
 import UserManagement from './pages/UserManagement';
-
-// Seed on first load
-seedDatabase();
 
 function ProtectedRoute({ children, allowedRoles }) {
   const session = getSession();

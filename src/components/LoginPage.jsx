@@ -15,15 +15,15 @@ export default function LoginPage({ onLogin }) {
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const session = login(email, password);
+    (async () => {
+      const session = await login(email, password);
       if (session) {
         onLogin(session);
       } else {
         setError('Invalid email or password');
       }
       setLoading(false);
-    }, 500);
+    })();
   };
 
   const demoAccounts = [

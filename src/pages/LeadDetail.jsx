@@ -9,7 +9,7 @@ import { getLeadById, updateLead, deleteLead } from '../services/leadService';
 import { getVisitsByLead, addVisit } from '../services/visitService';
 import { getActivitiesByLead } from '../services/activityService';
 import { logActivity } from '../services/activityService';
-import { getSourceName } from '../services/sourceService';
+import { getSourceName, getAllSources } from '../services/sourceService';
 import { getUserName, getSession, getAllUsers, hasPermission } from '../services/authService';
 import StatusBadge from '../components/StatusBadge';
 import ActivityTimeline from '../components/ActivityTimeline';
@@ -22,8 +22,9 @@ export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const session = getSession();
-  const users = getAllUsers();
 
+  const [users, setUsers] = useState([]);
+  const [sources, setSources] = useState([]);
   const [lead, setLead] = useState(null);
   const [visits, setVisits] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -50,36 +51,42 @@ export default function LeadDetail() {
     loadData();
   }, [id]);
 
-  const loadData = () => {
-    const l = getLeadById(id);
+  const loadData = async () => {
+    const [usrs, srcs] = await Promise.all([getAllUsers(), getAllSources()]);
+    setUsers(usrs);
+    setSources(srcs);
+
+    const l = await getLeadById(id);
     if (!l) { navigate('/leads'); return; }
     setLead(l);
-    setVisits(getVisitsByLead(id));
-    setActivities(getActivitiesByLead(id));
     setEditForm({ ...l });
+
+    const [v, a] = await Promise.all([getVisitsByLead(id), getActivitiesByLead(id)]);
+    setVisits(v);
+    setActivities(a);
   };
 
-  const handleStatusUpdate = () => {
+  const handleStatusUpdate = async () => {
     if (!statusForm.status) return;
-    updateLead(id, { status: statusForm.status, status_note: statusForm.note }, session.userId);
+    await updateLead(id, { status: statusForm.status, status_note: statusForm.note }, session.userId);
     setShowStatusModal(false);
     setStatusForm({ status: '', note: '' });
-    loadData();
+    await loadData();
   };
 
-  const handleAddVisit = () => {
-    addVisit({ lead_id: id, ...visitForm }, session.userId);
+  const handleAddVisit = async () => {
+    await addVisit({ lead_id: id, ...visitForm }, session.userId);
     setShowVisitModal(false);
     setVisitForm({
       visit_date: new Date().toISOString().split('T')[0],
       visit_time: new Date().toTimeString().slice(0, 5),
       site_location: 'Level Up Tower - Main Site', notes: '',
     });
-    loadData();
+    await loadData();
   };
 
-  const handleEdit = () => {
-    updateLead(id, {
+  const handleEdit = async () => {
+    await updateLead(id, {
       lead_name: editForm.lead_name,
       phone: editForm.phone,
       alternate_phone: editForm.alternate_phone,
@@ -93,21 +100,21 @@ export default function LeadDetail() {
       notes: editForm.notes,
     }, session.userId);
     setShowEditModal(false);
-    loadData();
+    await loadData();
   };
 
-  const handleDelete = () => {
-    deleteLead(id, session.userId);
+  const handleDelete = async () => {
+    await deleteLead(id, session.userId);
     navigate('/leads');
   };
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (!noteText.trim()) return;
-    logActivity(id, 'note_added', noteText.trim(), session.userId);
-    updateLead(id, {}, session.userId);
+    await logActivity(id, 'note_added', noteText.trim(), session.userId);
+    await updateLead(id, {}, session.userId);
     setNoteText('');
     setShowNoteModal(false);
-    loadData();
+    await loadData();
   };
 
   if (!lead) return null;
@@ -129,7 +136,7 @@ export default function LeadDetail() {
               <StatusBadge status={lead.status} />
             </div>
             <p className="page-subtitle">
-              Created {formatDateTime(lead.created_at)} by {getUserName(lead.created_by)}
+              Created {formatDateTime(lead.created_at)} by {getUserName(lead.created_by, users)}
             </p>
           </div>
         </div>
@@ -172,9 +179,9 @@ export default function LeadDetail() {
                 <div className="detail-field"><span className="detail-label">Phone</span><span className="detail-value">{lead.phone}</span></div>
                 {lead.alternate_phone && <div className="detail-field"><span className="detail-label">Alt Phone</span><span className="detail-value">{lead.alternate_phone}</span></div>}
                 {lead.email && <div className="detail-field"><span className="detail-label">Email</span><span className="detail-value">{lead.email}</span></div>}
-                <div className="detail-field"><span className="detail-label">Source</span><span className="detail-value">{getSourceName(lead.source_id)}</span></div>
-                <div className="detail-field"><span className="detail-label">Assigned To</span><span className="detail-value">{getUserName(lead.assigned_to)}</span></div>
-                {lead.attended_by && <div className="detail-field"><span className="detail-label">Attended By</span><span className="detail-value">{getUserName(lead.attended_by)}</span></div>}
+                <div className="detail-field"><span className="detail-label">Source</span><span className="detail-value">{getSourceName(lead.source_id, sources)}</span></div>
+                <div className="detail-field"><span className="detail-label">Assigned To</span><span className="detail-value">{getUserName(lead.assigned_to, users)}</span></div>
+                {lead.attended_by && <div className="detail-field"><span className="detail-label">Attended By</span><span className="detail-value">{getUserName(lead.attended_by, users)}</span></div>}
               </div>
             </div>
 
@@ -249,7 +256,7 @@ export default function LeadDetail() {
                   </div>
                   {v.notes && <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: 1.6 }}>{v.notes}</p>}
                   <div style={{ marginTop: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                    Logged by {getUserName(v.created_by)}
+                    Logged by {getUserName(v.created_by, users)}
                   </div>
                 </div>
               ))}

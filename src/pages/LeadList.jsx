@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search, Filter, Plus, X, Download, ChevronLeft, ChevronRight, UserPlus
@@ -24,18 +24,42 @@ export default function LeadList() {
   const [dateTo, setDateTo] = useState(searchParams.get('to') || '');
   const [page, setPage] = useState(1);
 
-  const sources = getAllSources();
-  const users = getAllUsers();
+  const [sources, setSources] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const leads = useMemo(() => {
-    return filterLeads({
-      search,
-      source_id: sourceFilter,
-      status: statusFilter,
-      assigned_to: assigneeFilter,
-      date_from: dateFrom,
-      date_to: dateTo,
-    });
+  // Load reference data once
+  useEffect(() => {
+    async function loadRef() {
+      const [srcs, usrs] = await Promise.all([getAllSources(), getAllUsers()]);
+      setSources(srcs);
+      setUsers(usrs);
+    }
+    loadRef();
+  }, []);
+
+  // Load leads when filters change
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLeads() {
+      setLoading(true);
+      const data = await filterLeads({
+        search,
+        source_id: sourceFilter,
+        status: statusFilter,
+        assigned_to: assigneeFilter,
+        date_from: dateFrom,
+        date_to: dateTo,
+      });
+      if (!cancelled) {
+        setLeads(data);
+        setLoading(false);
+      }
+    }
+    // Debounce search
+    const timer = setTimeout(loadLeads, search ? 300 : 0);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [search, sourceFilter, statusFilter, assigneeFilter, dateFrom, dateTo]);
 
   const totalPages = Math.ceil(leads.length / PAGE_SIZE);
@@ -158,9 +182,9 @@ export default function LeadList() {
                     <td style={{ color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                       {lead.phone}
                     </td>
-                    <td>{getSourceName(lead.source_id)}</td>
+                    <td>{getSourceName(lead.source_id, sources)}</td>
                     <td><StatusBadge status={lead.status} /></td>
-                    <td style={{ color: 'var(--color-text-secondary)' }}>{getUserName(lead.assigned_to)}</td>
+                    <td style={{ color: 'var(--color-text-secondary)' }}>{getUserName(lead.assigned_to, users)}</td>
                     <td style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>
                       {formatDate(lead.created_at)}
                     </td>
