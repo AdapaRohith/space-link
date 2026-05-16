@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Footprints, PhoneForwarded, TrendingUp,
-  Plus, ArrowRight, Building2, Clock
+  Plus, ArrowRight, Building2, Clock, BarChart3
 } from 'lucide-react';
 import { getLeadStats, getTodayLeads } from '../services/leadService';
 import { getRecentActivities } from '../services/activityService';
@@ -11,6 +11,91 @@ import { getSession, getAllUsers, getUserName } from '../services/authService';
 import StatusBadge from '../components/StatusBadge';
 import { LEAD_STATUSES } from '../data/seedData';
 import './Dashboard.css';
+
+// ===== SVG DONUT CHART COMPONENT =====
+function DonutChart({ data, size = 180, onSelect }) {
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+  if (total === 0) return null;
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = (size / 2) - 16;
+  const circumference = 2 * Math.PI * radius;
+  let cumulativePercent = 0;
+
+  return (
+    <div className="donut-chart-wrapper">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="donut-chart-svg">
+        {data.map((d, i) => {
+          const percent = d.count / total;
+          const strokeDasharray = `${percent * circumference} ${circumference}`;
+          const offset = cumulativePercent * circumference;
+          cumulativePercent += percent;
+
+          return (
+            <circle
+              key={d.name}
+              role="button"
+              tabIndex={0}
+              cx={cx}
+              cy={cy}
+              r={radius}
+              fill="none"
+              stroke={d.color}
+              strokeWidth="24"
+              strokeDasharray={strokeDasharray}
+              strokeDashoffset={-offset}
+              strokeLinecap="round"
+              className="donut-segment clickable"
+              style={{ animationDelay: `${i * 120}ms` }}
+              onClick={() => onSelect?.(d)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect?.(d); }}
+            />
+          );
+        })}
+        <text x={cx} y={cy - 6} textAnchor="middle" className="donut-total-value">{total}</text>
+        <text x={cx} y={cy + 14} textAnchor="middle" className="donut-total-label">Total</text>
+      </svg>
+      <div className="donut-legend">
+        {data.map(d => (
+          <button key={d.name} type="button" className="donut-legend-item clickable" onClick={() => onSelect?.(d)}>
+            <span className="donut-legend-dot" style={{ background: d.color }} />
+            <span className="donut-legend-label">{d.name}</span>
+            <span className="donut-legend-count">{d.count}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== SVG BAR CHART COMPONENT =====
+function BarChart({ data }) {
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+
+  return (
+    <div className="bar-chart">
+      {data.map((d, i) => (
+        <div key={d.label} className="bar-chart-row" style={{ animationDelay: `${i * 80}ms` }}>
+          <div className="bar-chart-label">
+            <span className="bar-dot" style={{ background: d.color }} />
+            <span>{d.label}</span>
+          </div>
+          <div className="bar-chart-track">
+            <div
+              className="bar-chart-fill"
+              style={{
+                width: `${(d.count / maxCount) * 100}%`,
+                background: `linear-gradient(90deg, ${d.color}, ${d.color}99)`,
+              }}
+            />
+          </div>
+          <span className="bar-chart-count">{d.count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -23,8 +108,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      // Users are hardcoded (synchronous)
-      const users = getAllUsers();
+      const users = await getAllUsers();
       setUsersCache(users);
 
       try {
@@ -57,15 +141,46 @@ export default function Dashboard() {
     { label: 'New Today', value: stats.newToday, icon: TrendingUp, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
   ];
 
-  const sourceData = sources.map(s => ({
-    name: s.source_name,
-    count: stats.bySource[s.id] || 0,
-  })).filter(s => s.count > 0);
+  // Source data for donut chart
+  const sourceColors = {
+    'Walk-In': '#3b82f6',
+    'Reference': '#8b5cf6',
+    'Online Enquiry': '#22c55e',
+    'Social Media': '#f59e0b',
+    'Other': '#64748b',
+  };
+  const sourceMap = new Map(sources.map(source => [source.id, source]));
+  const sourceData = Object.entries(stats.bySource || {})
+    .map(([sourceId, count]) => {
+      const source = sourceMap.get(sourceId);
+      const name = source?.source_name || getSourceName(sourceId, sources);
+      return {
+        id: sourceId,
+        name,
+        count,
+        color: sourceColors[name] || '#64748b',
+      };
+    })
+    .filter(s => s.count > 0);
 
+  const openSourceLeads = (source) => {
+    navigate(`/leads?source=${encodeURIComponent(source.id)}`);
+  };
+
+  // Status data for bar chart
   const statusData = LEAD_STATUSES.map(s => ({
     ...s,
     count: stats.byStatus[s.value] || 0,
   })).filter(s => s.count > 0);
+
+  // Assignee data for horizontal bar chart
+  const assigneeData = Object.entries(stats.byAssignee || {})
+    .map(([userId, count]) => ({
+      label: getUserName(userId, usersCache),
+      count,
+      color: userId === 'user_admin' ? '#c8a44e' : '#3b82f6',
+    }))
+    .sort((a, b) => b.count - a.count);
 
   function formatTime(dateStr) {
     const d = new Date(dateStr);
@@ -110,18 +225,63 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Charts Row */}
+      <div className="charts-row">
+        {/* Donut Chart — Leads by Source */}
+        <div className="card dashboard-card chart-card animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+          <div className="dashboard-card-header">
+            <h3><BarChart3 size={16} style={{ marginRight: '8px', opacity: 0.6 }} />Leads by Source</h3>
+          </div>
+          <div className="chart-body">
+            {sourceData.length > 0 ? (
+              <DonutChart data={sourceData} onSelect={openSourceLeads} />
+            ) : (
+              <p className="chart-empty">No data yet</p>
+            )}
+          </div>
+        </div>
+
+        {/* Bar Chart — Lead Pipeline */}
+        <div className="card dashboard-card chart-card animate-fade-in-up" style={{ animationDelay: '320ms' }}>
+          <div className="dashboard-card-header">
+            <h3><BarChart3 size={16} style={{ marginRight: '8px', opacity: 0.6 }} />Lead Pipeline</h3>
+          </div>
+          <div className="chart-body">
+            {statusData.length > 0 ? (
+              <BarChart data={statusData} />
+            ) : (
+              <p className="chart-empty">No data yet</p>
+            )}
+          </div>
+        </div>
+
+        {/* Team Performance */}
+        <div className="card dashboard-card chart-card animate-fade-in-up" style={{ animationDelay: '440ms' }}>
+          <div className="dashboard-card-header">
+            <h3><Users size={16} style={{ marginRight: '8px', opacity: 0.6 }} />Team Performance</h3>
+          </div>
+          <div className="chart-body">
+            {assigneeData.length > 0 ? (
+              <BarChart data={assigneeData} />
+            ) : (
+              <p className="chart-empty">No data yet</p>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="dashboard-grid">
         {/* Recent Leads */}
         <div className="card dashboard-card">
           <div className="dashboard-card-header">
-            <h3>Today's Leads</h3>
+            <h3>Recent Leads</h3>
             <button className="btn btn-ghost btn-sm" onClick={() => navigate('/leads')}>
               View All <ArrowRight size={14} />
             </button>
           </div>
           {recentLeads.length === 0 ? (
             <div className="empty-state" style={{ padding: 'var(--space-8) var(--space-4)' }}>
-              <p>No leads created today yet</p>
+              <p>No leads yet</p>
             </div>
           ) : (
             <div className="table-container" style={{ border: 'none' }}>
@@ -153,58 +313,13 @@ export default function Dashboard() {
 
         {/* Right Column */}
         <div className="dashboard-right">
-          {/* Sources Breakdown */}
-          <div className="card dashboard-card">
-            <div className="dashboard-card-header">
-              <h3>Leads by Source</h3>
-            </div>
-            <div className="source-bars">
-              {sourceData.map(s => {
-                const maxCount = Math.max(...sourceData.map(x => x.count), 1);
-                return (
-                  <div key={s.name} className="source-bar-item">
-                    <div className="source-bar-label">
-                      <span>{s.name}</span>
-                      <span className="text-accent">{s.count}</span>
-                    </div>
-                    <div className="source-bar-track">
-                      <div
-                        className="source-bar-fill"
-                        style={{ width: `${(s.count / maxCount) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-              {sourceData.length === 0 && (
-                <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', padding: '20px' }}>No data yet</p>
-              )}
-            </div>
-          </div>
-
-          {/* Status Breakdown */}
-          <div className="card dashboard-card">
-            <div className="dashboard-card-header">
-              <h3>Lead Pipeline</h3>
-            </div>
-            <div className="pipeline-grid">
-              {statusData.map(s => (
-                <div key={s.value} className="pipeline-item" onClick={() => navigate(`/leads?status=${s.value}`)}>
-                  <div className="pipeline-dot" style={{ background: s.color }} />
-                  <span className="pipeline-label">{s.label}</span>
-                  <span className="pipeline-count">{s.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Recent Activity */}
           <div className="card dashboard-card">
             <div className="dashboard-card-header">
               <h3>Recent Activity</h3>
             </div>
             <div className="activity-feed">
-              {activities.slice(0, 6).map(act => (
+              {activities.slice(0, 8).map(act => (
                 <div key={act.id} className="activity-feed-item">
                   <div className="activity-feed-dot" />
                   <div className="activity-feed-content">

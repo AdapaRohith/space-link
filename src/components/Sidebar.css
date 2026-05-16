@@ -19,42 +19,17 @@
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 10px;
   padding: 20px 20px 16px;
   border-bottom: 1px solid var(--color-border);
 }
 
-.logo-icon {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, rgba(200, 164, 78, 0.15), rgba(200, 164, 78, 0.05));
-  border: 1px solid rgba(200, 164, 78, 0.25);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.sidebar-logo-img {
+  width: 168px;
+  height: auto;
+  object-fit: contain;
   flex-shrink: 0;
-}
-
-.logo-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.logo-brand {
-  font-family: var(--font-family-display);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-}
-
-.logo-sub {
-  font-size: var(--font-size-xs);
-  color: var(--color-accent-500);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.15em;
 }
 
 .sidebar-close-btn {

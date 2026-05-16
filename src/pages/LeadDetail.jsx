@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Edit3, Trash2, MapPin, Phone, Mail,
   DollarSign, Building2, Calendar, Clock, Save, X,
-  UserCheck, MessageSquare, Plus, RefreshCw
+  UserCheck, MessageSquare, MessageCircle, Plus, RefreshCw
 } from 'lucide-react';
 import { getLeadById, updateLead, deleteLead } from '../services/leadService';
 import { getVisitsByLead, addVisit } from '../services/visitService';
@@ -52,7 +52,7 @@ export default function LeadDetail() {
   }, [id]);
 
   const loadData = async () => {
-    setUsers(getAllUsers());
+    setUsers(await getAllUsers());
     
     let srcs = [];
     try { srcs = await getAllSources(); } catch {}
@@ -127,6 +127,14 @@ export default function LeadDetail() {
 
   const formatDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   const formatDateTime = (d) => new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const canEditLead = session?.role !== 'sales' && hasPermission('edit_lead');
+  const getWhatsAppUrl = (phone) => {
+    let digits = String(phone || '').replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+    if (digits.length === 10) digits = `91${digits}`;
+    return digits ? `https://wa.me/${digits}` : '';
+  };
+  const whatsappUrl = getWhatsAppUrl(lead.phone);
 
   return (
     <div className="page">
@@ -147,15 +155,22 @@ export default function LeadDetail() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          {whatsappUrl && (
+            <button className="btn btn-secondary btn-sm" onClick={() => window.open(whatsappUrl, '_blank', 'noopener,noreferrer')}>
+              <MessageCircle size={14} /> WhatsApp
+            </button>
+          )}
           <button className="btn btn-secondary btn-sm" onClick={() => setShowNoteModal(true)}>
             <MessageSquare size={14} /> Add Note
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => { setStatusForm({ status: lead.status, note: '' }); setShowStatusModal(true); }}>
             <RefreshCw size={14} /> Update Status
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowEditModal(true)}>
-            <Edit3 size={14} /> Edit
-          </button>
+          {canEditLead && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowEditModal(true)}>
+              <Edit3 size={14} /> Edit
+            </button>
+          )}
           {hasPermission('delete_lead') && (
             <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 size={14} />
@@ -318,7 +333,7 @@ export default function LeadDetail() {
       </Modal>
 
       {/* Edit Modal */}
-      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Lead" wide
+      {canEditLead && <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Lead" wide
         footer={<><button className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
           <button className="btn btn-primary" onClick={handleEdit}><Save size={14} /> Save Changes</button></>}>
         <div className="form-row">
@@ -352,7 +367,7 @@ export default function LeadDetail() {
           <input type="text" value={editForm.preferred_location || ''} onChange={e => setEditForm(p => ({ ...p, preferred_location: e.target.value }))} /></div>
         <div className="form-group"><label>Notes</label>
           <textarea value={editForm.notes || ''} onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} rows={4} /></div>
-      </Modal>
+      </Modal>}
 
       {/* Note Modal */}
       <Modal isOpen={showNoteModal} onClose={() => setShowNoteModal(false)} title="Add Note"

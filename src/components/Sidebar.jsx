@@ -1,16 +1,17 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, UserPlus, ClipboardList, Building2,
-  LogOut, Menu, X, ChevronLeft, Shield, Triangle
+  LogOut, Menu, X, ChevronLeft, Shield
 } from 'lucide-react';
 import { getSession, logout } from '../services/authService';
+import spaceLinkLogo from '../assets/space-link-logo.png';
 import './Sidebar.css';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
   { path: '/leads', label: 'All Leads', icon: ClipboardList, roles: ['admin', 'sales', 'receptionist'] },
   { path: '/leads/new', label: 'Add Lead', icon: UserPlus, roles: ['admin', 'sales', 'receptionist'] },
-  { path: '/walkins', label: 'Walk-In Log', icon: Building2, roles: ['admin', 'sales', 'receptionist'] },
+  { path: '/walkins', label: 'Walk-In Log', icon: Building2, roles: ['admin', 'receptionist'] },
   { path: '/users', label: 'Team', icon: Users, roles: ['admin'] },
 ];
 
@@ -39,13 +40,7 @@ export default function Sidebar({ isOpen, onToggle }) {
       <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
         {/* Logo Section */}
         <div className="sidebar-logo">
-          <div className="logo-icon">
-            <Triangle size={22} fill="var(--color-accent-500)" strokeWidth={0} />
-          </div>
-          <div className="logo-text">
-            <span className="logo-brand">SPACE LINK</span>
-            <span className="logo-sub">CRM</span>
-          </div>
+          <img src={spaceLinkLogo} alt="Space Link" className="sidebar-logo-img" />
           <button className="sidebar-close-btn hide-desktop" onClick={onToggle}>
             <X size={20} />
           </button>

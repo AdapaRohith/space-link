@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Triangle, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { login } from '../services/authService';
+import spaceLinkLogo from '../assets/space-link-logo.png';
 import './LoginPage.css';
 
 export default function LoginPage({ onLogin }) {
@@ -10,20 +11,21 @@ export default function LoginPage({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const session = login(email, password);
+    try {
+      const session = await login(email, password);
       if (session) {
         onLogin(session);
       } else {
         setError('Invalid email or password');
       }
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
   const demoAccounts = [
@@ -42,11 +44,7 @@ export default function LoginPage({ onLogin }) {
         <div className="login-card">
           {/* Logo */}
           <div className="login-logo">
-            <div className="login-logo-icon">
-              <Triangle size={32} fill="var(--color-accent-500)" strokeWidth={0} />
-            </div>
-            <h1 className="login-title">SPACE LINK</h1>
-            <p className="login-subtitle">Real Estate CRM</p>
+            <img src={spaceLinkLogo} alt="Space Link" className="login-logo-img" />
           </div>
 
           {/* Form */}
