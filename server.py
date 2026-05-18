@@ -107,22 +107,20 @@ app = FastAPI(title="SpaceLink CRM API", lifespan=lifespan)
 # Layer 1: middleware — normal responses
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=CORS_ORIGIN_RE.pattern,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    allow_headers=["*"],
 )
 
 
 def _cors_headers(request: Request) -> dict:
     origin = request.headers.get("origin", "")
-    if origin and CORS_ORIGIN_RE.fullmatch(origin):
-        return {
-            "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Credentials": "true",
-            "Vary": "Origin",
-        }
-    return {}
+    return {
+        "Access-Control-Allow-Origin": origin or "*",
+        "Access-Control-Allow-Credentials": "true",
+        "Vary": "Origin",
+    }
 
 
 # Layer 2: exception handler — error responses must carry CORS headers manually
