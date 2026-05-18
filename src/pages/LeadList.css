@@ -1,1 +1,180 @@
-/* LeadList page specific overrides - minimal since most comes from components.css */
+/* ===== LEAD LIST ===== */
+
+/* ── Sales search view ── */
+.sales-search-wrapper {
+  max-width: 600px;
+  margin: 0 auto var(--space-8);
+}
+
+.sales-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sales-search-box input {
+  height: 52px;
+  font-size: var(--font-size-md);
+  padding-left: 48px;
+  padding-right: 44px;
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+}
+
+.sales-search-box input:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px var(--color-primary-dim);
+}
+
+.sales-search-icon {
+  position: absolute;
+  left: 16px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.sales-search-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+  margin-top: var(--space-2);
+}
+
+.sales-search-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.sales-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.sales-results-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.sales-results-count strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── Sales hero ── */
+.sales-search-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-12) var(--space-8);
+  text-align: center;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.sales-hero-visual {
+  margin-bottom: var(--space-5);
+}
+
+.sales-hero-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-xl);
+  background: var(--color-primary-dim);
+  border: 1px solid var(--color-primary-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+}
+
+/* Results container — re-keyed on each search to replay animation */
+.results-appear {
+  animation: resultsIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes resultsIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Each row staggers in */
+.results-appear .table tbody tr {
+  animation: resultsIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.results-appear .table tbody tr:nth-child(1)  { animation-delay:  0ms; }
+.results-appear .table tbody tr:nth-child(2)  { animation-delay: 20ms; }
+.results-appear .table tbody tr:nth-child(3)  { animation-delay: 35ms; }
+.results-appear .table tbody tr:nth-child(4)  { animation-delay: 48ms; }
+.results-appear .table tbody tr:nth-child(5)  { animation-delay: 58ms; }
+.results-appear .table tbody tr:nth-child(6)  { animation-delay: 66ms; }
+.results-appear .table tbody tr:nth-child(7)  { animation-delay: 72ms; }
+.results-appear .table tbody tr:nth-child(8)  { animation-delay: 76ms; }
+.results-appear .table tbody tr:nth-child(n+9) { animation-delay: 80ms; }
+
+.sales-hero-text {
+  margin-bottom: var(--space-6);
+}
+
+.sales-hero-text h3 {
+  font-size: var(--font-size-xl);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.sales-hero-text p {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.sales-tips {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sales-tip-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  min-width: 160px;
+}
+
+.sales-tip-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tip-name  { background: var(--color-primary-dim); color: var(--color-primary); }
+.tip-phone { background: var(--color-gold-dim);    color: var(--color-gold); }
+
+.sales-tip-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sales-tip-label strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}

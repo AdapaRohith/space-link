@@ -10,6 +10,21 @@ import StatusBadge from '../components/StatusBadge';
 import { LEAD_STATUSES } from '../data/seedData';
 import './LeadList.css';
 
+// Case-insensitive prefix match on first name, last name, or full name.
+// Digits-only query → phone contains match.
+// "su" matches "Sushanth" or "Kumar Su..." but NOT "Kasu".
+function matchesQuery(lead, query) {
+  const q = query.toLowerCase().trim();
+  if (!q) return true;
+  if (/^\d+$/.test(q)) {
+    return (lead.phone || '').includes(q) || (lead.alternate_phone || '').includes(q);
+  }
+  const first = (lead.first_name || '').toLowerCase();
+  const last  = (lead.last_name  || '').toLowerCase();
+  const full  = (lead.lead_name  || '').toLowerCase();
+  return first.startsWith(q) || last.startsWith(q) || full.startsWith(q);
+}
+
 const PAGE_SIZE = 15;
 const IMPORT_EXPORT_FIELDS = [
   'lead_name', 'phone', 'alternate_phone', 'email', 'source_id', 'source',
@@ -60,6 +75,12 @@ function normalizeHeader(header) {
   return header.trim().toLowerCase().replace(/\s+/g, '_');
 }
 
+function formatDate(dateStr) {
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+}
+
 /* ── Sales-only search view ────────────────────────────────── */
 function SalesSearchView() {
   const navigate = useNavigate();
@@ -86,27 +107,22 @@ function SalesSearchView() {
       return;
     }
 
+    const q = query.trim();
     let cancelled = false;
     const timer = setTimeout(async () => {
       setLoading(true);
       setSearched(true);
       try {
-        const data = await filterLeads({ search: query.trim() });
-        if (!cancelled) setResults(data);
+        const data = await filterLeads({ search: q });
+        if (!cancelled) setResults((data || []).filter(l => matchesQuery(l, q)));
       } catch {
         if (!cancelled) setResults([]);
       }
       if (!cancelled) setLoading(false);
-    }, 400);
+    }, 120);
 
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query]);
-
-  function formatDate(dateStr) {
-    return new Date(dateStr).toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'short', year: 'numeric',
-    });
-  }
 
   return (
     <div className="page">
@@ -159,7 +175,7 @@ function SalesSearchView() {
       )}
 
       {!loading && searched && results.length > 0 && (
-        <>
+        <div key={query} className="results-appear">
           <div className="sales-results-header">
             <span className="sales-results-count">
               Found <strong>{results.length}</strong> matching lead{results.length !== 1 ? 's' : ''}
@@ -181,7 +197,9 @@ function SalesSearchView() {
                 {results.map(lead => (
                   <tr key={lead.id} onClick={() => navigate(`/leads/${lead.id}`)}>
                     <td>
-                      <div style={{ fontWeight: 600 }}>{lead.lead_name}</div>
+                      <div style={{ fontWeight: 600 }}>
+                        {lead.first_name ? `${lead.first_name} ${lead.last_name || ''}`.trim() : lead.lead_name}
+                      </div>
                       {lead.email && (
                         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
                           {lead.email}
@@ -202,7 +220,7 @@ function SalesSearchView() {
               </tbody>
             </table>
           </div>
-        </>
+        </div>
       )}
 
       {/* Hero section — shown when no search is active */}
@@ -297,6 +315,10 @@ function AdminLeadList() {
     loadRef();
   }, []);
 
+  const hasSearch = search.trim().length > 0;
+  const hasFilters = !!(sourceFilter || statusFilter || assigneeFilter || dateFrom || dateTo);
+  const canShowLeads = hasSearch || hasFilters;
+
   const getLeadFilters = useCallback(() => ({
     search,
     source_id: sourceFilter,
@@ -306,25 +328,34 @@ function AdminLeadList() {
     date_to: dateTo,
   }), [search, sourceFilter, statusFilter, assigneeFilter, dateFrom, dateTo]);
 
-  // Load leads when filters change
+  // Only load leads when a search term or filter is active
   useEffect(() => {
+    if (!canShowLeads) {
+      setLeads([]);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     async function loadLeads() {
       setLoading(true);
       try {
         const data = await filterLeads(getLeadFilters());
         if (!cancelled) {
-          setLeads(data);
+          // Client-side exact substring filter so backend fuzzy matches don't leak through
+          const s = search.trim();
+          const filtered = s
+            ? (data || []).filter(l => matchesQuery(l, s))
+            : (data || []);
+          setLeads(filtered);
         }
       } catch {
         if (!cancelled) setLeads([]);
       }
       if (!cancelled) setLoading(false);
     }
-    // Debounce search
-    const timer = setTimeout(loadLeads, search ? 300 : 0);
+    const timer = setTimeout(loadLeads, search ? 100 : 0);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [getLeadFilters, search, refreshKey]);
+  }, [getLeadFilters, search, refreshKey, canShowLeads]);
 
   const totalPages = Math.ceil(leads.length / PAGE_SIZE);
   const paginatedLeads = leads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -341,12 +372,6 @@ function AdminLeadList() {
     setDateTo('');
     setSearch('');
   };
-
-  function formatDate(dateStr) {
-    return new Date(dateStr).toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'short', year: 'numeric',
-    });
-  }
 
   const handleExport = async () => {
     const exportLeads = await filterLeads(getLeadFilters());
@@ -433,7 +458,11 @@ function AdminLeadList() {
       <div className="page-header">
         <div>
           <h1 className="page-title">All Leads</h1>
-          <p className="page-subtitle">{leads.length} lead{leads.length !== 1 ? 's' : ''} found</p>
+          <p className="page-subtitle">
+            {canShowLeads
+              ? `${leads.length} lead${leads.length !== 1 ? 's' : ''} found`
+              : 'Search by name or phone to view leads'}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <input
@@ -446,7 +475,7 @@ function AdminLeadList() {
           <button className="btn btn-secondary" onClick={() => importInputRef.current?.click()} disabled={importing}>
             <Upload size={16} /> {importing ? 'Importing...' : 'Import'}
           </button>
-          <button className="btn btn-secondary" onClick={handleExport} disabled={loading}>
+          <button className="btn btn-secondary" onClick={handleExport} disabled={loading || importing}>
             <Download size={16} /> Export
           </button>
           <button className="btn btn-primary" onClick={() => navigate('/leads/new')}>
@@ -516,9 +545,22 @@ function AdminLeadList() {
         )}
       </div>
 
+      {/* Prompt — shown when no search or filter is active */}
+      {!canShowLeads && (
+        <div className="sales-search-hero">
+          <div className="sales-hero-visual">
+            <div className="sales-hero-icon"><Search size={28} /></div>
+          </div>
+          <div className="sales-hero-text">
+            <h3>Search to see leads</h3>
+            <p>Type a name or phone number in the search box, or use the filters above to find leads.</p>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
-      {paginatedLeads.length > 0 ? (
-        <>
+      {canShowLeads && paginatedLeads.length > 0 ? (
+        <div key={search + sourceFilter + statusFilter} className="results-appear">
           <div className="table-container">
             <table className="table">
               <thead>
@@ -536,12 +578,21 @@ function AdminLeadList() {
                 {paginatedLeads.map(lead => (
                   <tr key={lead.id} onClick={() => navigate(`/leads/${lead.id}`)}>
                     <td>
-                      <div style={{ fontWeight: 600 }}>{lead.lead_name}</div>
-                      {lead.email && (
-                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                          {lead.email}
+                      <div className="lead-name-cell">
+                        <div className="lead-avatar">
+                          {(lead.first_name || lead.lead_name || '?').charAt(0).toUpperCase()}
                         </div>
-                      )}
+                        <div>
+                          <div style={{ fontWeight: 600 }}>
+                            {lead.first_name ? `${lead.first_name} ${lead.last_name || ''}`.trim() : lead.lead_name}
+                          </div>
+                          {lead.email && (
+                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                              {lead.email}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td style={{ color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                       {lead.phone}
@@ -577,19 +628,17 @@ function AdminLeadList() {
               </button>
             </div>
           )}
-        </>
-      ) : (
+        </div>
+      ) : canShowLeads ? (
         <div className="empty-state">
-          <div className="empty-state-icon">
-            <UserPlus size={28} />
-          </div>
+          <div className="empty-state-icon"><UserPlus size={28} /></div>
           <h3>No leads found</h3>
-          <p>{search || activeFilters > 0 ? 'Try adjusting your search or filters' : 'Start by adding your first lead'}</p>
+          <p>No lead matched your search. Try a different name or phone number.</p>
           <button className="btn btn-primary" onClick={() => navigate('/leads/new')}>
             <Plus size={16} /> Add New Lead
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

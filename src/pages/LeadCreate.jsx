@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User, Phone, Mail, MapPin, Building2, DollarSign, Save,
-  ArrowLeft, AlertTriangle, UserCheck, Calendar, Clock, MessageSquare
+  ArrowLeft, AlertTriangle, UserCheck, MessageSquare
 } from 'lucide-react';
 import { createLead, checkDuplicate } from '../services/leadService';
 import { addVisit } from '../services/visitService';
@@ -20,19 +20,15 @@ export default function LeadCreate() {
 
   useEffect(() => {
     async function load() {
-      setUsers(getAllUsers());
-      try {
-        const srcs = await getAllSources();
-        setSources(srcs);
-      } catch {
-        setSources([]);
-      }
+      setUsers(await getAllUsers());
+      try { setSources(await getAllSources()); } catch { setSources([]); }
     }
     load();
   }, []);
 
   const [form, setForm] = useState({
-    lead_name: '', phone: '', alternate_phone: '', email: '',
+    first_name: '', last_name: '',
+    phone: '', alternate_phone: '', email: '',
     source_id: '', custom_source: '', assigned_to: '', attended_by: '',
     budget: '', preferred_location: '', property_type: '', bhk: '', notes: '',
     referrer_name: '', referrer_phone: '',
@@ -70,7 +66,8 @@ export default function LeadCreate() {
 
   const validate = () => {
     const errs = {};
-    if (!form.lead_name.trim()) errs.lead_name = 'Name is required';
+    if (!form.first_name.trim()) errs.first_name = 'First name is required';
+    if (!form.last_name.trim()) errs.last_name = 'Last name is required';
     if (!form.phone.trim()) errs.phone = 'Phone is required';
     else if (form.phone.replace(/\D/g, '').length < 10) errs.phone = 'Enter a valid phone number';
     if (!form.source_id) errs.source_id = 'Source is required';
@@ -83,11 +80,8 @@ export default function LeadCreate() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-
     setSaving(true);
-
     try {
-      // Handle custom source
       let sourceId = form.source_id;
       if (showCustomSource && form.custom_source) {
         const newSource = await addCustomSource(form.custom_source);
@@ -95,7 +89,8 @@ export default function LeadCreate() {
       }
 
       const leadData = {
-        lead_name: form.lead_name.trim(),
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
         phone: form.phone.replace(/\D/g, ''),
         alternate_phone: form.alternate_phone.replace(/\D/g, ''),
         email: form.email.trim(),
@@ -114,7 +109,6 @@ export default function LeadCreate() {
 
       const newLead = await createLead(leadData, session.userId);
 
-      // Add visit if provided
       if (form.visit_date || isWalkIn) {
         await addVisit({
           lead_id: newLead.id,
@@ -152,19 +146,21 @@ export default function LeadCreate() {
           </button>
           <div>
             <h1 className="page-title">Add New Lead</h1>
-            <p className="page-subtitle">Capture lead information and requirements</p>
+            <p className="page-subtitle">Capture lead information and property requirements</p>
           </div>
         </div>
       </div>
 
-      {/* Duplicate Warning */}
       {showDuplicateWarning && (
         <div className="duplicate-warning">
           <AlertTriangle size={20} className="warning-icon" />
           <div>
             <strong style={{ color: 'var(--color-warning)' }}>Possible Duplicate Detected</strong>
             <p style={{ fontSize: 'var(--font-size-sm)', marginTop: '4px' }}>
-              {duplicates.map(d => `${d.lead_name} (${d.phone})`).join(', ')} — already exists.
+              {duplicates.map(d => {
+                const name = d.first_name ? `${d.first_name} ${d.last_name || ''}`.trim() : d.lead_name;
+                return `${name} (${d.phone})`;
+              }).join(', ')} — already exists.
             </p>
             <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
               <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/leads/${duplicates[0].id}`)}>
@@ -184,36 +180,40 @@ export default function LeadCreate() {
           <div className="lead-form-main">
             {/* Basic Info */}
             <div className="form-section">
-              <div className="form-section-title">
-                <User size={16} /> Basic Information
-              </div>
+              <div className="form-section-title"><User size={14} /> Basic Information</div>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="required">Lead Name</label>
-                  <input type="text" value={form.lead_name} onChange={e => set('lead_name', e.target.value)}
-                    placeholder="Full name" autoFocus />
-                  {errors.lead_name && <div className="form-error">{errors.lead_name}</div>}
+                  <label className="required">First Name</label>
+                  <input type="text" value={form.first_name} onChange={e => set('first_name', e.target.value)}
+                    placeholder="First name" autoFocus />
+                  {errors.first_name && <div className="form-error">{errors.first_name}</div>}
                 </div>
+                <div className="form-group">
+                  <label className="required">Last Name</label>
+                  <input type="text" value={form.last_name} onChange={e => set('last_name', e.target.value)}
+                    placeholder="Last name" />
+                  {errors.last_name && <div className="form-error">{errors.last_name}</div>}
+                </div>
+              </div>
+              <div className="form-row">
                 <div className="form-group">
                   <label className="required">Phone Number</label>
                   <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
                     onBlur={handlePhoneBlur} placeholder="10-digit number" maxLength={12} />
                   {errors.phone && <div className="form-error">{errors.phone}</div>}
                 </div>
-              </div>
-              <div className="form-row">
                 <div className="form-group">
                   <label>Alternate Number</label>
                   <input type="tel" value={form.alternate_phone} onChange={e => set('alternate_phone', e.target.value)}
                     onBlur={handlePhoneBlur} placeholder="Optional" maxLength={12} />
                 </div>
+              </div>
+              <div className="form-row">
                 <div className="form-group">
                   <label>Email</label>
                   <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
                     placeholder="Optional" />
                 </div>
-              </div>
-              <div className="form-row">
                 <div className="form-group">
                   <label className="required">Lead Source</label>
                   <select value={showCustomSource ? '__custom__' : form.source_id}
@@ -224,14 +224,6 @@ export default function LeadCreate() {
                   </select>
                   {errors.source_id && <div className="form-error">{errors.source_id}</div>}
                 </div>
-                <div className="form-group">
-                  <label className="required">Assigned To</label>
-                  <select value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
-                    <option value="">Select team member</option>
-                    {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
-                  </select>
-                  {errors.assigned_to && <div className="form-error">{errors.assigned_to}</div>}
-                </div>
               </div>
               {showCustomSource && (
                 <div className="form-group">
@@ -241,14 +233,20 @@ export default function LeadCreate() {
                   {errors.custom_source && <div className="form-error">{errors.custom_source}</div>}
                 </div>
               )}
+              <div className="form-group">
+                <label className="required">Assigned To</label>
+                <select value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
+                  <option value="">Select team member</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                </select>
+                {errors.assigned_to && <div className="form-error">{errors.assigned_to}</div>}
+              </div>
             </div>
 
             {/* Walk-In Fields */}
             {isWalkIn && (
               <div className="form-section">
-                <div className="form-section-title">
-                  <Building2 size={16} /> Walk-In Details
-                </div>
+                <div className="form-section-title"><Building2 size={14} /> Walk-In Details</div>
                 <div className="form-row">
                   <div className="form-group">
                     <label>Walk-In Date</label>
@@ -272,9 +270,7 @@ export default function LeadCreate() {
             {/* Reference Fields */}
             {isReference && (
               <div className="form-section">
-                <div className="form-section-title">
-                  <UserCheck size={16} /> Referrer Information
-                </div>
+                <div className="form-section-title"><UserCheck size={14} /> Referrer Information</div>
                 <div className="form-row">
                   <div className="form-group">
                     <label>Referrer Name</label>
@@ -294,7 +290,8 @@ export default function LeadCreate() {
             {!isWalkIn && (
               <div className="form-section">
                 <div className="form-section-title">
-                  <MapPin size={16} /> Visit Information <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 400 }}>(Optional)</span>
+                  <MapPin size={14} /> Visit Information
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: '6px', textTransform: 'none', letterSpacing: 0 }}>(Optional)</span>
                 </div>
                 <div className="form-row">
                   <div className="form-group">
@@ -306,12 +303,10 @@ export default function LeadCreate() {
                     <input type="time" value={form.visit_time} onChange={e => set('visit_time', e.target.value)} />
                   </div>
                 </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Site Location</label>
-                    <input type="text" value={form.site_location} onChange={e => set('site_location', e.target.value)}
-                      placeholder="e.g. Level Up Tower - Main Site" />
-                  </div>
+                <div className="form-group">
+                  <label>Site Location</label>
+                  <input type="text" value={form.site_location} onChange={e => set('site_location', e.target.value)}
+                    placeholder="e.g. Level Up Tower - Main Site" />
                 </div>
                 <div className="form-group">
                   <label>Visit Notes</label>
@@ -322,12 +317,10 @@ export default function LeadCreate() {
             )}
           </div>
 
-          {/* Right Column - Requirements */}
+          {/* Right Column */}
           <div className="lead-form-sidebar">
             <div className="form-section">
-              <div className="form-section-title">
-                <DollarSign size={16} /> Client Requirements
-              </div>
+              <div className="form-section-title"><DollarSign size={14} /> Client Requirements</div>
               <div className="form-group">
                 <label>Budget</label>
                 <input type="text" value={form.budget} onChange={e => set('budget', e.target.value)}
@@ -359,13 +352,12 @@ export default function LeadCreate() {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="form-actions-sticky">
               <button type="button" className="btn btn-secondary w-full" onClick={() => navigate(-1)}>
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary w-full" disabled={saving}>
-                {saving ? <span className="login-spinner" /> : <><Save size={16} /> Save Lead</>}
+                {saving ? <span className="spinner" /> : <><Save size={15} /> Save Lead</>}
               </button>
             </div>
           </div>

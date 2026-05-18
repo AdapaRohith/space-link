@@ -7,8 +7,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'https://crm-sli-api.avlokai.com',
         changeOrigin: true,
+        secure: true,
       },
     },
   },

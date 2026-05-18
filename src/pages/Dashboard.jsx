@@ -298,7 +298,7 @@ export default function Dashboard() {
                 <tbody>
                   {recentLeads.map(lead => (
                     <tr key={lead.id} onClick={() => navigate(`/leads/${lead.id}`)}>
-                      <td style={{ fontWeight: 600 }}>{lead.lead_name}</td>
+                      <td style={{ fontWeight: 600 }}>{lead.first_name ? `${lead.first_name} ${lead.last_name || ''}`.trim() : lead.lead_name}</td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{lead.phone}</td>
                       <td><span className="text-muted">{getSourceName(lead.source_id, sources)}</span></td>
                       <td><StatusBadge status={lead.status} /></td>

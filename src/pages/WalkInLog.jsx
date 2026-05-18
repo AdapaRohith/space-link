@@ -22,14 +22,17 @@ export default function WalkInLog() {
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
-    lead_name: '', phone: '', email: '', assigned_to: '', attended_by: '',
+    first_name: '', last_name: '', phone: '', email: '', assigned_to: '', attended_by: '',
     walkin_time: new Date().toTimeString().slice(0, 5), notes: '',
   });
   const [errors, setErrors] = useState({});
 
-  // Load users once (synchronous — hardcoded)
+  // Load users once
   useEffect(() => {
-    setUsers(getAllUsers());
+    async function loadUsers() {
+      setUsers(await getAllUsers());
+    }
+    loadUsers();
   }, []);
 
   // Load walk-ins when filters change
@@ -46,10 +49,10 @@ export default function WalkInLog() {
               String(localDate.getDate()).padStart(2, '0');
             return dateStr === dateFilter;
           })
-          .filter(l => !search ||
-            l.lead_name.toLowerCase().includes(search.toLowerCase()) ||
-            l.phone.includes(search)
-          );
+          .filter(l => {
+            const name = l.first_name ? `${l.first_name} ${l.last_name || ''}`.trim() : (l.lead_name || '');
+            return !search || name.toLowerCase().includes(search.toLowerCase()) || l.phone.includes(search);
+          });
         setWalkins(filtered);
       } catch {
         setWalkins([]);
@@ -66,14 +69,16 @@ export default function WalkInLog() {
 
   const handleQuickAdd = async () => {
     const errs = {};
-    if (!form.lead_name.trim()) errs.lead_name = 'Required';
+    if (!form.first_name.trim()) errs.first_name = 'Required';
+    if (!form.last_name.trim()) errs.last_name = 'Required';
     if (!form.phone.trim()) errs.phone = 'Required';
     if (!form.assigned_to) errs.assigned_to = 'Required';
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
     const lead = await createLead({
-      lead_name: form.lead_name.trim(),
+      first_name: form.first_name.trim(),
+      last_name: form.last_name.trim(),
       phone: form.phone,
       email: form.email,
       source_id: 'src_walkin',
@@ -90,7 +95,7 @@ export default function WalkInLog() {
     }, session.userId);
 
     setForm({
-      lead_name: '', phone: '', email: '', assigned_to: '', attended_by: '',
+      first_name: '', last_name: '', phone: '', email: '', assigned_to: '', attended_by: '',
       walkin_time: new Date().toTimeString().slice(0, 5), notes: '',
     });
     setShowModal(false);
@@ -147,9 +152,9 @@ export default function WalkInLog() {
             <div key={lead.id} className="walkin-card animate-fade-in-up" style={{ animationDelay: `${i * 60}ms` }}
               onClick={() => navigate(`/leads/${lead.id}`)}>
               <div className="walkin-card-header">
-                <div className="walkin-avatar">{lead.lead_name.charAt(0).toUpperCase()}</div>
+                <div className="walkin-avatar">{(lead.first_name || lead.lead_name || '?').charAt(0).toUpperCase()}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="walkin-name">{lead.lead_name}</div>
+                  <div className="walkin-name">{lead.first_name ? `${lead.first_name} ${lead.last_name || ''}`.trim() : lead.lead_name}</div>
                   <div className="walkin-phone">{lead.phone}</div>
                 </div>
                 <StatusBadge status={lead.status} />
@@ -183,22 +188,30 @@ export default function WalkInLog() {
         </>}>
         <div className="form-row">
           <div className="form-group">
-            <label className="required">Visitor Name</label>
-            <input type="text" value={form.lead_name} onChange={e => set('lead_name', e.target.value)}
-              placeholder="Full name" autoFocus />
-            {errors.lead_name && <div className="form-error">{errors.lead_name}</div>}
+            <label className="required">First Name</label>
+            <input type="text" value={form.first_name} onChange={e => set('first_name', e.target.value)}
+              placeholder="First name" autoFocus />
+            {errors.first_name && <div className="form-error">{errors.first_name}</div>}
           </div>
+          <div className="form-group">
+            <label className="required">Last Name</label>
+            <input type="text" value={form.last_name} onChange={e => set('last_name', e.target.value)}
+              placeholder="Last name" />
+            {errors.last_name && <div className="form-error">{errors.last_name}</div>}
+          </div>
+        </div>
+        <div className="form-row">
           <div className="form-group">
             <label className="required">Phone</label>
             <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
               placeholder="Phone number" />
             {errors.phone && <div className="form-error">{errors.phone}</div>}
           </div>
-        </div>
-        <div className="form-group">
-          <label>Email</label>
-          <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
-            placeholder="Optional" />
+          <div className="form-group">
+            <label>Email</label>
+            <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
+              placeholder="Optional" />
+          </div>
         </div>
         <div className="form-row">
           <div className="form-group">

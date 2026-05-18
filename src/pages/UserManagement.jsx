@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
 import {
   Users, Plus, Edit3, Shield, Phone, Mail, UserCheck,
-  UserX, ChevronDown, Save
+  UserX, ChevronDown, Save, Trash2, Clock, RefreshCw
 } from 'lucide-react';
-import { getAllUsersIncludingInactive, addUser, updateUser, toggleUserActive, getSession } from '../services/authService';
+import { getAllUsersIncludingInactive, addUser, updateUser, toggleUserActive, deleteUser, getSession, getPendingUsers, approveUser, rejectUser } from '../services/authService';
 import { apiGet } from '../services/storage';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './UserManagement.css';
 
 export default function UserManagement() {
   const session = getSession();
   const [users, setUsers] = useState([]);
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [leadCounts, setLeadCounts] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [deletingUser, setDeletingUser] = useState(null);
   const [form, setForm] = useState({
     name: '', email: '', phone: '', role: 'sales', password_hash: '',
   });
@@ -22,13 +26,38 @@ export default function UserManagement() {
   useEffect(() => { loadUsers(); }, []);
 
   const loadUsers = async () => {
-    setUsers(getAllUsersIncludingInactive());
+    const [active, pending] = await Promise.allSettled([
+      getAllUsersIncludingInactive(),
+      getPendingUsers(),
+    ]);
+    setUsers(active.status === 'fulfilled' ? active.value : []);
+    setPendingUsers(pending.status === 'fulfilled' ? pending.value : []);
     try {
       const counts = await apiGet('/leads/counts-by-assignee');
       setLeadCounts(counts);
     } catch {
       setLeadCounts({});
     }
+  };
+
+  const handleRefreshPending = async () => {
+    setRefreshing(true);
+    try {
+      const pending = await getPendingUsers();
+      setPendingUsers(pending);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleApprove = async (userId) => {
+    await approveUser(userId);
+    await loadUsers();
+  };
+
+  const handleReject = async (userId) => {
+    await rejectUser(userId);
+    await loadUsers();
   };
 
   const set = (field, value) => {
@@ -78,6 +107,13 @@ export default function UserManagement() {
     await loadUsers();
   };
 
+  const handleDelete = async () => {
+    if (!deletingUser) return;
+    await deleteUser(deletingUser.id);
+    setDeletingUser(null);
+    await loadUsers();
+  };
+
   const roleColors = {
     admin: { bg: 'rgba(200, 164, 78, 0.12)', color: '#c8a44e' },
     sales: { bg: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa' },
@@ -97,6 +133,57 @@ export default function UserManagement() {
           <Plus size={16} /> Add Member
         </button>
       </div>
+
+      {/* Pending Approval Requests */}
+      {pendingUsers.length > 0 && (
+        <div className="pending-section">
+          <div className="pending-header">
+            <Clock size={15} />
+            <span>Pending Approval</span>
+            <span className="pending-count">{pendingUsers.length}</span>
+            <button
+              className="btn btn-ghost btn-icon btn-sm"
+              onClick={handleRefreshPending}
+              disabled={refreshing}
+              title="Refresh"
+              style={{ marginLeft: 'auto', color: '#ca8a04' }}
+            >
+              <RefreshCw size={13} className={refreshing ? 'spin' : ''} />
+            </button>
+          </div>
+          <div className="pending-list">
+            {pendingUsers.map(user => (
+              <div key={user.id} className="pending-card">
+                <div className="pending-avatar">{user.name.charAt(0).toUpperCase()}</div>
+                <div className="pending-info">
+                  <div className="pending-name">{user.name}</div>
+                  <div className="pending-meta">
+                    <span>{user.email}</span>
+                    {user.phone && <span>· {user.phone}</span>}
+                    <span>· {user.role}</span>
+                  </div>
+                </div>
+                <div className="pending-actions">
+                  <button
+                    className="btn btn-sm"
+                    style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)', border: '1px solid rgba(34,197,94,0.25)' }}
+                    onClick={() => handleApprove(user.id)}
+                  >
+                    <UserCheck size={13} /> Approve
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '1px solid rgba(239,68,68,0.25)' }}
+                    onClick={() => handleReject(user.id)}
+                  >
+                    <UserX size={13} /> Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* User Cards */}
       <div className="user-grid">
@@ -125,14 +212,24 @@ export default function UserManagement() {
                   <Edit3 size={14} />
                 </button>
                 {user.id !== session.userId && (
-                  <button
-                    className="btn btn-ghost btn-icon btn-sm"
-                    onClick={() => handleToggle(user.id)}
-                    title={user.active ? 'Deactivate' : 'Activate'}
-                    style={{ color: user.active ? 'var(--color-danger)' : 'var(--color-success)' }}
-                  >
-                    {user.active ? <UserX size={14} /> : <UserCheck size={14} />}
-                  </button>
+                  <>
+                    <button
+                      className="btn btn-ghost btn-icon btn-sm"
+                      onClick={() => handleToggle(user.id)}
+                      title={user.active ? 'Deactivate' : 'Activate'}
+                      style={{ color: user.active ? 'var(--color-danger)' : 'var(--color-success)' }}
+                    >
+                      {user.active ? <UserX size={14} /> : <UserCheck size={14} />}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-icon btn-sm"
+                      onClick={() => setDeletingUser(user)}
+                      title="Delete"
+                      style={{ color: 'var(--color-danger)' }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -190,6 +287,16 @@ export default function UserManagement() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deletingUser}
+        onClose={() => setDeletingUser(null)}
+        onConfirm={handleDelete}
+        title="Delete Team Member"
+        message={`Permanently delete "${deletingUser?.name}"? This cannot be undone.`}
+        confirmText="Delete"
+        danger
+      />
     </div>
   );
 }

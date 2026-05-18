@@ -1,3 +1,10 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+
 # Logs
 logs
 *.log
@@ -7,12 +14,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Environment
+.env
+.env.local
 *.local
 
-# Editor directories and files
+# Editor directories
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -23,6 +30,10 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment
-.env
-.env.local
+# Dev tools (Claude Code)
+.claude/
+CLAUDE.md
+
+# Legacy backend (not used — using remote API)
+server/
+server.py

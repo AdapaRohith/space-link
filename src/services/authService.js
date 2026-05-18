@@ -1,38 +1,19 @@
-// ===== AUTH SERVICE — HARDCODED CREDENTIALS =====
+// ===== AUTH SERVICE — API BACKED =====
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from './storage';
 
 const SESSION_KEY = 'crm_session';
 
-// Hardcoded users — no backend needed for login
-const USERS = [
-  {
-    id: 'user_admin',
-    name: 'KarunaKumar',
-    role: 'admin',
-    email: 'karuna@spacelink.in',
-    password: 'admin123',
-  },
-  {
-    id: 'user_sales1',
-    name: 'Sales Team',
-    role: 'sales',
-    email: 'sales@spacelink.in',
-    password: 'sales123',
-  },
-];
-
-export function login(email, password) {
-  const user = USERS.find(u => u.email === email && u.password === password);
-  if (!user) return null;
-
-  const session = {
-    userId: user.id,
-    name: user.name,
-    role: user.role,
-    email: user.email,
-    loginAt: new Date().toISOString(),
-  };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  return session;
+export async function login(email, password) {
+  try {
+    const session = await apiPost('/auth/login', { email, password });
+    if (session && session.userId) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      return session;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export function logout() {
@@ -49,24 +30,37 @@ export function getSession() {
 }
 
 export function getCurrentUser() {
-  const session = getSession();
-  if (!session) return null;
-  return USERS.find(u => u.id === session.userId) || null;
+  return getSession();
 }
 
-export function getAllUsers() {
-  return USERS.map(({ password, ...u }) => u);
+// Cache for users fetched from API
+let _usersCache = null;
+
+export async function getAllUsers() {
+  try {
+    const users = await apiGet('/users/active');
+    _usersCache = users;
+    return users;
+  } catch {
+    return _usersCache || [];
+  }
 }
 
-export function getAllUsersIncludingInactive() {
-  return USERS.map(({ password, ...u }) => ({ ...u, active: true }));
+export async function getAllUsersIncludingInactive() {
+  try {
+    const users = await apiGet('/users');
+    _usersCache = users;
+    return users;
+  } catch {
+    return _usersCache || [];
+  }
 }
 
 export function getUserById(id) {
-  const user = USERS.find(u => u.id === id);
-  if (!user) return null;
-  const { password, ...safe } = user;
-  return safe;
+  if (_usersCache) {
+    return _usersCache.find(u => u.id === id) || null;
+  }
+  return null;
 }
 
 export function getUserName(id, usersCache) {
@@ -74,9 +68,11 @@ export function getUserName(id, usersCache) {
     const user = usersCache.find(u => u.id === id);
     if (user) return user.name;
   }
-  // Fallback to hardcoded list
-  const user = USERS.find(u => u.id === id);
-  return user ? user.name : id || 'Unknown';
+  if (_usersCache) {
+    const user = _usersCache.find(u => u.id === id);
+    if (user) return user.name;
+  }
+  return id || 'Unknown';
 }
 
 export function hasPermission(action) {
@@ -92,6 +88,74 @@ export function hasPermission(action) {
   return rolePerms.includes(action) || session.role === 'admin';
 }
 
-export function addUser() { return null; }
-export function updateUser() { return null; }
-export function toggleUserActive() { return null; }
+export async function addUser(userData) {
+  try {
+    const user = await apiPost('/users', userData);
+    _usersCache = null; // invalidate cache
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateUser(id, updates) {
+  try {
+    const user = await apiPut(`/users/${id}`, updates);
+    _usersCache = null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+export async function toggleUserActive(id) {
+  try {
+    const user = await apiPatch(`/users/${id}/toggle`);
+    _usersCache = null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteUser(id) {
+  try {
+    await apiDelete(`/users/${id}`);
+    _usersCache = null;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function signup(userData) {
+  return await apiPost('/auth/signup', userData);
+}
+
+export async function getPendingUsers() {
+  try {
+    return await apiGet('/users/pending');
+  } catch {
+    return [];
+  }
+}
+
+export async function approveUser(id) {
+  try {
+    const user = await apiPost(`/users/${id}/approve`, {});
+    _usersCache = null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+export async function rejectUser(id) {
+  try {
+    await apiDelete(`/users/${id}`);
+    _usersCache = null;
+    return true;
+  } catch {
+    return false;
+  }
+}

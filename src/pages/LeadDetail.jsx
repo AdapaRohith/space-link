@@ -93,7 +93,8 @@ export default function LeadDetail() {
 
   const handleEdit = async () => {
     await updateLead(id, {
-      lead_name: editForm.lead_name,
+      first_name: editForm.first_name,
+      last_name: editForm.last_name,
       phone: editForm.phone,
       alternate_phone: editForm.alternate_phone,
       email: editForm.email,
@@ -127,6 +128,7 @@ export default function LeadDetail() {
 
   const formatDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   const formatDateTime = (d) => new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const getLeadName = (l) => l?.first_name ? `${l.first_name} ${l.last_name || ''}`.trim() : (l?.lead_name || '');
   const canEditLead = session?.role !== 'sales' && hasPermission('edit_lead');
   const getWhatsAppUrl = (phone) => {
     let digits = String(phone || '').replace(/\D/g, '');
@@ -146,7 +148,7 @@ export default function LeadDetail() {
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h1 className="page-title">{lead.lead_name}</h1>
+              <h1 className="page-title">{getLeadName(lead)}</h1>
               <StatusBadge status={lead.status} />
             </div>
             <p className="page-subtitle">
@@ -337,8 +339,12 @@ export default function LeadDetail() {
         footer={<><button className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
           <button className="btn btn-primary" onClick={handleEdit}><Save size={14} /> Save Changes</button></>}>
         <div className="form-row">
-          <div className="form-group"><label>Lead Name</label>
-            <input type="text" value={editForm.lead_name || ''} onChange={e => setEditForm(p => ({ ...p, lead_name: e.target.value }))} /></div>
+          <div className="form-group"><label className="required">First Name</label>
+            <input type="text" value={editForm.first_name || ''} onChange={e => setEditForm(p => ({ ...p, first_name: e.target.value }))} /></div>
+          <div className="form-group"><label className="required">Last Name</label>
+            <input type="text" value={editForm.last_name || ''} onChange={e => setEditForm(p => ({ ...p, last_name: e.target.value }))} /></div>
+        </div>
+        <div className="form-row">
           <div className="form-group"><label>Phone</label>
             <input type="tel" value={editForm.phone || ''} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} /></div>
         </div>
@@ -386,7 +392,7 @@ export default function LeadDetail() {
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
         title="Delete Lead"
-        message={`Are you sure you want to delete "${lead.lead_name}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${getLeadName(lead)}"? This action cannot be undone.`}
         confirmText="Delete Lead"
         danger
       />

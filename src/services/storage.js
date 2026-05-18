@@ -1,6 +1,6 @@
-// ===== API HELPER — REPLACES LOCALSTORAGE CRUD =====
+// ===== API HELPER =====
 
-const API_BASE = '/api';
+const API_BASE = 'https://crm-sli-api.avlokai.com/api';
 
 async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
