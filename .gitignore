@@ -35,5 +35,4 @@ lerna-debug.log*
 CLAUDE.md
 
 # Legacy backend (not used — using remote API)
-server/
-server.py
+
