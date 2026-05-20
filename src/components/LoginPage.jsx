@@ -212,7 +212,7 @@ export default function LoginPage({ onLogin }) {
                       value={form.role}
                       onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
                     >
-                      <option value="sales">Sales Executive</option>
+                      <option value="sales">Sales Team</option>
                       <option value="receptionist">Receptionist</option>
                     </select>
                   </div>

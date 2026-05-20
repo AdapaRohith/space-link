@@ -2,14 +2,24 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User, MapPin, Building2, DollarSign, Save,
-  ArrowLeft, AlertTriangle, UserCheck, MessageSquare
+  ArrowLeft, AlertTriangle, UserCheck
 } from 'lucide-react';
 import { createLead, checkDuplicate } from '../services/leadService';
 import { addVisit } from '../services/visitService';
 import { getAllSources, addCustomSource } from '../services/sourceService';
 import { getAllUsers, getSession } from '../services/authService';
 import { PROPERTY_TYPES, BHK_OPTIONS } from '../data/seedData';
+import { COUNTRY_CODES } from '../data/countryCodes';
+import PrettySelect from '../components/PrettySelect';
 import './LeadCreate.css';
+
+const BUDGET_OPTIONS = ['<50L', '50L-1Cr', '1Cr-1.5cr', '1.5-2', '2-2.5', '2.5-3', '3-3.5', '3.5-4', '4-5', '5-6', '6-7cr'];
+const BUDGET_SELECT_OPTIONS = BUDGET_OPTIONS.map(option => ({ value: option, label: option }));
+const today = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+};
+const currentTime = () => new Date().toTimeString().slice(0, 5);
 
 export default function LeadCreate() {
   const navigate = useNavigate();
@@ -28,22 +38,21 @@ export default function LeadCreate() {
 
   const [form, setForm] = useState({
     first_name: '', last_name: '',
-    phone_country_code: '+91', phone: '', alternate_phone: '', email: '',
+    phone_country_code: '91', phone: '', alternate_phone: '', email: '',
     source_id: '', custom_source: '', assigned_to: '', attended_by: '',
-    tele_caller_name: '', requirement_summary: '',
+    requirement_summary: '',
     site_visit_scheduled: false, site_visit_done: false, feedback: '',
-    budget: '', preferred_location: '', property_type: '', bhk: '', notes: '',
+    budget: '', preferred_location: '', property_type: '', bhk: '',
     referrer_name: '', referrer_phone: '',
-    walkin_date: new Date().toISOString().split('T')[0],
-    walkin_time: new Date().toTimeString().slice(0, 5),
-    visit_date: '', visit_time: '', site_location: '', visit_notes: '',
+    walkin_date: today(),
+    walkin_time: currentTime(),
+    visit_date: today(), visit_time: currentTime(), site_location: '', visit_notes: '',
   });
 
   const [errors, setErrors] = useState({});
   const [duplicates, setDuplicates] = useState([]);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showCustomSource, setShowCustomSource] = useState(false);
 
   const set = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -52,34 +61,59 @@ export default function LeadCreate() {
 
   const isWalkIn = form.source_id === 'src_walkin';
   const isReference = form.source_id === 'src_reference';
+  const isOtherSource = form.source_id === '__other__';
+  const visibleSources = sources.filter(s => s.source_name?.trim().toLowerCase() !== 'other');
 
-  const handlePhoneBlur = async () => {
-    if (form.phone.length >= 10) {
-      const dupes = await checkDuplicate(form.phone, form.alternate_phone);
-      if (dupes.length > 0) {
-        setDuplicates(dupes);
-        setShowDuplicateWarning(true);
-      } else {
-        setDuplicates([]);
-        setShowDuplicateWarning(false);
-      }
+  useEffect(() => {
+    const phone = form.phone.replace(/\D/g, '');
+    const alternatePhone = form.alternate_phone.replace(/\D/g, '');
+    if (phone.length < 10 && alternatePhone.length < 10) {
+      setDuplicates([]);
+      setShowDuplicateWarning(false);
+      return undefined;
     }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const dupes = await checkDuplicate(phone, alternatePhone);
+        if (cancelled) return;
+        if (dupes.length > 0) {
+          navigate(`/leads/${dupes[0].id}`, {
+            replace: true,
+            state: { openEdit: true, duplicatePhone: phone || alternatePhone },
+          });
+          return;
+        }
+        setDuplicates(dupes);
+        setShowDuplicateWarning(false);
+      } catch {
+        if (!cancelled) {
+          setDuplicates([]);
+          setShowDuplicateWarning(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [form.phone, form.alternate_phone, navigate]);
+
+  const handlePhoneChange = (field, value) => {
+    set(field, value.replace(/\D/g, '').slice(0, 10));
   };
 
   const validate = () => {
     const errs = {};
     if (!form.first_name.trim()) errs.first_name = 'First name is required';
-    if (!form.last_name.trim()) errs.last_name = 'Last name is required';
-    if (!form.phone_country_code.trim()) errs.phone_country_code = 'Country code is required';
     if (!form.phone.trim()) errs.phone = 'Phone is required';
     else if (form.phone.replace(/\D/g, '').length < 10) errs.phone = 'Enter a valid phone number';
-    if (!form.alternate_phone.trim()) errs.alternate_phone = 'Alternate number is required';
-    else if (form.alternate_phone.replace(/\D/g, '').length < 10) errs.alternate_phone = 'Enter a valid alternate number';
+    if (form.alternate_phone.trim() && form.alternate_phone.replace(/\D/g, '').length < 10) errs.alternate_phone = 'Enter a valid alternate number';
     if (!form.source_id) errs.source_id = 'Source is required';
+    if (isOtherSource && !form.custom_source.trim()) errs.custom_source = 'Other source details are required';
     if (!form.assigned_to) errs.assigned_to = 'Assignment is required';
-    if (!form.attended_by) errs.attended_by = 'Handled by is required';
-    if (!form.tele_caller_name.trim()) errs.tele_caller_name = 'Tele caller name is required';
-    if (showCustomSource && !form.custom_source.trim()) errs.custom_source = 'Enter custom source name';
     if (isWalkIn) {
       if (!form.walkin_date) errs.walkin_date = 'Walk-in date is required';
       if (!form.walkin_time) errs.walkin_time = 'Walk-in time is required';
@@ -89,13 +123,6 @@ export default function LeadCreate() {
       if (!form.referrer_phone.trim()) errs.referrer_phone = 'Referrer phone is required';
       else if (form.referrer_phone.replace(/\D/g, '').length < 10) errs.referrer_phone = 'Enter a valid referrer phone';
     }
-    if (!form.requirement_summary.trim()) errs.requirement_summary = 'Requirement summary is required';
-    if (!form.budget.trim()) errs.budget = 'Budget is required';
-    if (!form.preferred_location.trim()) errs.preferred_location = 'Preferred location is required';
-    if (!form.property_type) errs.property_type = 'Property type is required';
-    if (!form.bhk) errs.bhk = 'BHK requirement is required';
-    if (!form.notes.trim()) errs.notes = 'Notes are required';
-    if (!form.feedback.trim()) errs.feedback = 'Feedback is required';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -103,12 +130,28 @@ export default function LeadCreate() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+    const phone = form.phone.replace(/\D/g, '');
+    const alternatePhone = form.alternate_phone.replace(/\D/g, '');
+    if (phone.length >= 10 || alternatePhone.length >= 10) {
+      const dupes = await checkDuplicate(phone, alternatePhone);
+      if (dupes.length > 0) {
+        navigate(`/leads/${dupes[0].id}`, {
+          replace: true,
+          state: { openEdit: true, duplicatePhone: phone || alternatePhone },
+        });
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       let sourceId = form.source_id;
-      if (showCustomSource && form.custom_source) {
-        const newSource = await addCustomSource(form.custom_source);
-        sourceId = newSource.id;
+      let dataSource = sources.find(s => s.id === sourceId)?.source_name || '';
+
+      if (isOtherSource) {
+        const customSource = await addCustomSource(form.custom_source.trim());
+        sourceId = customSource.id;
+        dataSource = customSource.source_name;
       }
 
       const leadData = {
@@ -116,16 +159,14 @@ export default function LeadCreate() {
         last_name: form.last_name.trim(),
         phone: form.phone.replace(/\D/g, ''),
         phone_country_code: form.phone_country_code.trim(),
-        alternate_phone: form.alternate_phone.replace(/\D/g, ''),
+        alternate_phone: form.alternate_phone ? form.alternate_phone.replace(/\D/g, '') : '',
         email: form.email.trim(),
         source_id: sourceId,
-        data_source: showCustomSource
-          ? form.custom_source.trim()
-          : (sources.find(s => s.id === sourceId)?.source_name || ''),
+        data_source: dataSource,
         custom_source: form.custom_source,
         assigned_to: form.assigned_to,
-        attended_by: form.attended_by || '',
-        tele_caller_name: form.tele_caller_name,
+        attended_by: form.attended_by.trim() || form.assigned_to,
+        tele_caller_name: '',
         requirement_summary: form.requirement_summary,
         site_visit_scheduled: form.site_visit_scheduled,
         site_visit_done: form.site_visit_done,
@@ -134,19 +175,19 @@ export default function LeadCreate() {
         preferred_location: form.preferred_location,
         property_type: form.property_type,
         bhk: form.bhk,
-        notes: form.notes,
         referrer_name: form.referrer_name,
         referrer_phone: form.referrer_phone,
       };
 
       const newLead = await createLead(leadData, session.userId);
+      const siteLocation = form.site_location.trim();
 
-      if (form.visit_date || isWalkIn) {
+      if (siteLocation) {
         await addVisit({
           lead_id: newLead.id,
           visit_date: form.visit_date || form.walkin_date,
           visit_time: form.visit_time || form.walkin_time,
-          site_location: form.site_location || 'Level Up Tower - Main Site',
+          site_location: siteLocation,
           notes: form.visit_notes || (isWalkIn ? 'Walk-in visit' : ''),
         }, session.userId);
       }
@@ -159,14 +200,8 @@ export default function LeadCreate() {
   };
 
   const handleSourceChange = (value) => {
-    if (value === '__custom__') {
-      setShowCustomSource(true);
-      set('source_id', '');
-    } else {
-      setShowCustomSource(false);
-      set('custom_source', '');
-      set('source_id', value);
-    }
+    set('custom_source', '');
+    set('source_id', value);
   };
 
   return (
@@ -221,7 +256,7 @@ export default function LeadCreate() {
                   {errors.first_name && <div className="form-error">{errors.first_name}</div>}
                 </div>
                 <div className="form-group">
-                  <label className="required">Last Name</label>
+                  <label>Last Name</label>
                   <input type="text" value={form.last_name} onChange={e => set('last_name', e.target.value)}
                     placeholder="Last name" />
                   {errors.last_name && <div className="form-error">{errors.last_name}</div>}
@@ -229,21 +264,28 @@ export default function LeadCreate() {
               </div>
               <div className="form-row">
                 <div className="form-group" style={{ maxWidth: '140px' }}>
-                  <label className="required">Country Code</label>
-                  <input type="text" value={form.phone_country_code} onChange={e => set('phone_country_code', e.target.value)}
-                    placeholder="+91" />
+                  <label>Country Code</label>
+                  <PrettySelect
+                    value={form.phone_country_code}
+                    onChange={value => set('phone_country_code', value)}
+                    options={COUNTRY_CODES}
+                    searchable
+                    searchPlaceholder="Search country or code"
+                    className="country-code-select"
+                    compactCode
+                  />
                   {errors.phone_country_code && <div className="form-error">{errors.phone_country_code}</div>}
                 </div>
                 <div className="form-group">
                   <label className="required">Phone Number</label>
-                  <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
-                    onBlur={handlePhoneBlur} placeholder="10-digit number" maxLength={12} />
+                  <input type="tel" value={form.phone} onChange={e => handlePhoneChange('phone', e.target.value)}
+                    placeholder="10-digit number" maxLength={10} />
                   {errors.phone && <div className="form-error">{errors.phone}</div>}
                 </div>
                 <div className="form-group">
-                  <label className="required">Alternate Number</label>
-                  <input type="tel" value={form.alternate_phone} onChange={e => set('alternate_phone', e.target.value)}
-                    onBlur={handlePhoneBlur} placeholder="Optional" maxLength={12} />
+                  <label>Alternate Number</label>
+                  <input type="tel" value={form.alternate_phone} onChange={e => handlePhoneChange('alternate_phone', e.target.value)}
+                    placeholder="Optional" maxLength={10} />
                   {errors.alternate_phone && <div className="form-error">{errors.alternate_phone}</div>}
                 </div>
               </div>
@@ -255,20 +297,20 @@ export default function LeadCreate() {
                 </div>
                 <div className="form-group">
                   <label className="required">Lead Source</label>
-                  <select value={showCustomSource ? '__custom__' : form.source_id}
+                  <select value={form.source_id}
                     onChange={e => handleSourceChange(e.target.value)}>
                     <option value="">Select source</option>
-                    {sources.map(s => <option key={s.id} value={s.id}>{s.source_name}</option>)}
-                    <option value="__custom__">+ Add Custom Source</option>
+                    {visibleSources.map(s => <option key={s.id} value={s.id}>{s.source_name}</option>)}
+                    <option value="__other__">Other</option>
                   </select>
                   {errors.source_id && <div className="form-error">{errors.source_id}</div>}
                 </div>
               </div>
-              {showCustomSource && (
+              {isOtherSource && (
                 <div className="form-group">
-                  <label className="required">Custom Source Name</label>
+                  <label className="required">Other Source Details</label>
                   <input type="text" value={form.custom_source} onChange={e => set('custom_source', e.target.value)}
-                    placeholder="Enter new source name" />
+                    placeholder="Enter lead source" />
                   {errors.custom_source && <div className="form-error">{errors.custom_source}</div>}
                 </div>
               )}
@@ -280,21 +322,11 @@ export default function LeadCreate() {
                 </select>
                 {errors.assigned_to && <div className="form-error">{errors.assigned_to}</div>}
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="required">Attended / Handled by</label>
-                  <select value={form.attended_by} onChange={e => set('attended_by', e.target.value)}>
-                    <option value="">Select team member</option>
-                    {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
-                  </select>
-                  {errors.attended_by && <div className="form-error">{errors.attended_by}</div>}
-                </div>
-                <div className="form-group">
-                  <label className="required">Tele Caller Name</label>
-                  <input type="text" value={form.tele_caller_name} onChange={e => set('tele_caller_name', e.target.value)}
-                    placeholder="Tele caller name" />
-                  {errors.tele_caller_name && <div className="form-error">{errors.tele_caller_name}</div>}
-                </div>
+              <div className="form-group">
+                <label>Attended / Handled by</label>
+                <input type="text" value={form.attended_by} onChange={e => set('attended_by', e.target.value)}
+                  placeholder="Handled by" />
+                {errors.attended_by && <div className="form-error">{errors.attended_by}</div>}
               </div>
             </div>
 
@@ -323,13 +355,13 @@ export default function LeadCreate() {
                 <div className="form-section-title"><UserCheck size={14} /> Referrer Information</div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="required">Referrer Name</label>
+                    <label className="required">Reference</label>
                     <input type="text" value={form.referrer_name} onChange={e => set('referrer_name', e.target.value)}
                       placeholder="Who referred this lead?" />
                     {errors.referrer_name && <div className="form-error">{errors.referrer_name}</div>}
                   </div>
                   <div className="form-group">
-                    <label className="required">Referrer Phone</label>
+                    <label className="required">Reference Number</label>
                     <input type="tel" value={form.referrer_phone} onChange={e => set('referrer_phone', e.target.value)}
                       placeholder="Referrer's phone number" />
                     {errors.referrer_phone && <div className="form-error">{errors.referrer_phone}</div>}
@@ -363,7 +395,7 @@ export default function LeadCreate() {
                 <div className="form-group">
                   <label>Visit Notes</label>
                   <textarea value={form.visit_notes} onChange={e => set('visit_notes', e.target.value)}
-                    placeholder="Notes about the visit..." rows={3} />
+                    placeholder="Notes about the visit..." rows={2} />
                 </div>
               </div>
             )}
@@ -374,25 +406,29 @@ export default function LeadCreate() {
             <div className="form-section">
               <div className="form-section-title"><DollarSign size={14} /> Client Requirements</div>
               <div className="form-group">
-                <label className="required">Requirement Summary</label>
+                <label>Requirement Summary</label>
                 <textarea value={form.requirement_summary} onChange={e => set('requirement_summary', e.target.value)}
-                  placeholder="Short summary of what the client needs..." rows={4} />
+                  placeholder="Short summary of what the client needs..." rows={3} />
                 {errors.requirement_summary && <div className="form-error">{errors.requirement_summary}</div>}
               </div>
               <div className="form-group">
-                <label className="required">Budget</label>
-                <input type="text" value={form.budget} onChange={e => set('budget', e.target.value)}
-                  placeholder="e.g. 1.5 Cr" />
+                <label>Budget</label>
+                <PrettySelect
+                  value={form.budget}
+                  onChange={value => set('budget', value)}
+                  options={BUDGET_SELECT_OPTIONS}
+                  placeholder="Select budget"
+                />
                 {errors.budget && <div className="form-error">{errors.budget}</div>}
               </div>
               <div className="form-group">
-                <label className="required">Preferred Location</label>
+                <label>Preferred Location</label>
                 <input type="text" value={form.preferred_location} onChange={e => set('preferred_location', e.target.value)}
                   placeholder="e.g. Level Up Tower" />
                 {errors.preferred_location && <div className="form-error">{errors.preferred_location}</div>}
               </div>
               <div className="form-group">
-                <label className="required">Property Type</label>
+                <label>Property Type</label>
                 <select value={form.property_type} onChange={e => set('property_type', e.target.value)}>
                   <option value="">Select type</option>
                   {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -400,38 +436,12 @@ export default function LeadCreate() {
                 {errors.property_type && <div className="form-error">{errors.property_type}</div>}
               </div>
               <div className="form-group">
-                <label className="required">BHK Requirement</label>
+                <label>BHK Requirement</label>
                 <select value={form.bhk} onChange={e => set('bhk', e.target.value)}>
                   <option value="">Select</option>
                   {BHK_OPTIONS.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
                 {errors.bhk && <div className="form-error">{errors.bhk}</div>}
-              </div>
-              <div className="form-group">
-                <label className="required">Notes</label>
-                <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
-                  placeholder="Additional notes about client requirements..." rows={5} />
-                {errors.notes && <div className="form-error">{errors.notes}</div>}
-              </div>
-            </div>
-
-            <div className="form-section">
-              <div className="form-section-title"><MessageSquare size={14} /> Visit Feedback</div>
-              <label className="checkbox-row">
-                <input type="checkbox" checked={form.site_visit_scheduled}
-                  onChange={e => set('site_visit_scheduled', e.target.checked)} />
-                Site Visit Scheduled
-              </label>
-              <label className="checkbox-row">
-                <input type="checkbox" checked={form.site_visit_done}
-                  onChange={e => set('site_visit_done', e.target.checked)} />
-                Site Visit Done
-              </label>
-              <div className="form-group">
-                <label className="required">Feedback</label>
-                <textarea value={form.feedback} onChange={e => set('feedback', e.target.value)}
-                  placeholder="Client feedback after call or visit..." rows={4} />
-                {errors.feedback && <div className="form-error">{errors.feedback}</div>}
               </div>
             </div>
 

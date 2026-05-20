@@ -119,6 +119,7 @@ async def lifespan(app: FastAPI):
         execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS site_visit_scheduled BOOLEAN NOT NULL DEFAULT FALSE")
         execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS site_visit_done BOOLEAN NOT NULL DEFAULT FALSE")
         execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS feedback TEXT NOT NULL DEFAULT ''")
+        execute(conn, "ALTER TABLE leads DROP CONSTRAINT IF EXISTS leads_attended_by_fkey")
     yield
 
 
@@ -427,19 +428,8 @@ def validate_single_lead_create(data: LeadCreate):
     required_fields = [
         ("lead_name", "Name"),
         ("phone", "Phone No."),
-        ("alternate_phone", "Alternate Number"),
-        ("phone_country_code", "Country Code"),
         ("source_id", "Lead Source"),
         ("assigned_to", "Assigned To"),
-        ("attended_by", "Attended / Handled by"),
-        ("tele_caller_name", "Tele Caller Name"),
-        ("requirement_summary", "Requirement Summary"),
-        ("budget", "Budget"),
-        ("preferred_location", "Preferred Location"),
-        ("property_type", "Property Type"),
-        ("bhk", "BHK Requirement"),
-        ("notes", "Notes"),
-        ("feedback", "Feedback"),
     ]
     missing = [
         label for field, label in required_fields
@@ -455,6 +445,20 @@ def validate_single_lead_create(data: LeadCreate):
             status_code=400,
             detail={"message": "Lead validation failed", "missing": missing},
         )
+
+
+def resolve_user_id(conn, value: str | None) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    user = row(
+        conn,
+        "SELECT id FROM users "
+        "WHERE id = %s OR LOWER(email) = LOWER(%s) OR LOWER(name) = LOWER(%s) "
+        "ORDER BY active DESC, name LIMIT 1",
+        (text, text, text),
+    )
+    return user["id"] if user else ""
 
 
 # Order matters: specific paths before /{lead_id}
@@ -501,27 +505,50 @@ def create_leads_bulk(data: LeadBulkCreate) -> dict:
     if not data.leads:
         raise HTTPException(status_code=400, detail="No leads supplied")
 
-    errors = []
-    for index, lead_data in enumerate(data.leads, start=2):
-        missing = []
-        if not lead_data.lead_name.strip():
-            missing.append("Name")
-        if not lead_data.phone.strip():
-            missing.append("Phone No.")
-        if not lead_data.source_id.strip():
-            missing.append("Data Source")
-        if not lead_data.assigned_to.strip():
-            missing.append("Attended / Handled by")
-        if missing:
-            errors.append({"row": index, "missing": missing})
-
-    if errors:
-        raise HTTPException(status_code=400, detail={"message": "Import validation failed", "errors": errors})
-
     created = []
     created_by = data.created_by or ""
     with db() as conn:
-        for lead_data in data.leads:
+        errors = []
+        normalized_users = []
+        phones_in_batch = {}
+        for index, lead_data in enumerate(data.leads, start=2):
+            missing = []
+            if not lead_data.lead_name.strip():
+                missing.append("Name")
+            if not lead_data.phone.strip():
+                missing.append("Phone No.")
+            if not lead_data.source_id.strip():
+                missing.append("Data Source")
+
+            for phone_value in [lead_data.phone, lead_data.alternate_phone]:
+                phone_text = str(phone_value or "").strip()
+                if not phone_text:
+                    continue
+                if phone_text in phones_in_batch:
+                    missing.append(f"Duplicate phone also on row {phones_in_batch[phone_text]}")
+                else:
+                    phones_in_batch[phone_text] = index
+
+            existing_duplicate = check_duplicate(lead_data.phone, lead_data.alternate_phone)
+            if existing_duplicate:
+                missing.append("Phone already exists")
+
+            assigned_to = resolve_user_id(conn, lead_data.assigned_to)
+            if not assigned_to:
+                missing.append("Assigned To")
+
+            attended_by = str(lead_data.attended_by or "").strip()
+            if not attended_by:
+                missing.append("Attended / Handled by")
+
+            if missing:
+                errors.append({"row": index, "missing": missing})
+            normalized_users.append((assigned_to, attended_by))
+
+        if errors:
+            raise HTTPException(status_code=400, detail={"message": "Import validation failed", "errors": errors})
+
+        for lead_data, (assigned_to, attended_by) in zip(data.leads, normalized_users):
             lead_id = new_id()
             actor = lead_data.created_by or created_by
             lead = row(
@@ -537,8 +564,7 @@ def create_leads_bulk(data: LeadBulkCreate) -> dict:
                 (
                     lead_id, lead_data.lead_name, lead_data.phone,
                     lead_data.alternate_phone or "", lead_data.email or "",
-                    lead_data.source_id, lead_data.assigned_to,
-                    lead_data.attended_by or lead_data.assigned_to,
+                    lead_data.source_id, assigned_to, attended_by,
                     lead_data.status or "new", lead_data.budget or "",
                     lead_data.preferred_location or "", lead_data.property_type or "",
                     lead_data.bhk or "", lead_data.notes or "",
@@ -566,8 +592,8 @@ def get_leads(
 ) -> list:
     conds, values = [], []
     if search:
-        conds.append("(lead_name ILIKE %s OR phone ILIKE %s OR email ILIKE %s)")
-        values.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+        conds.append("(lead_name ILIKE %s OR phone ILIKE %s OR alternate_phone ILIKE %s OR email ILIKE %s)")
+        values.extend([f"%{search}%", f"%{search}%", f"%{search}%", f"%{search}%"])
     if source_id:
         conds.append("source_id = %s"); values.append(source_id)
     if status:
@@ -597,6 +623,17 @@ def create_lead(data: LeadCreate) -> dict:
     validate_single_lead_create(data)
     lead_id = new_id()
     with db() as conn:
+        assigned_to = resolve_user_id(conn, data.assigned_to)
+        attended_by = str(data.attended_by or "").strip() or assigned_to
+        missing = []
+        if not assigned_to:
+            missing.append("Assigned To")
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": "Lead validation failed", "missing": missing},
+            )
+
         lead = row(
             conn,
             f"""INSERT INTO leads (
@@ -609,8 +646,8 @@ def create_lead(data: LeadCreate) -> dict:
             RETURNING {LEAD_COLS}""",
             (
                 lead_id, data.lead_name, data.phone, data.alternate_phone or "",
-                data.email or "", data.source_id, data.assigned_to,
-                data.attended_by or "", data.status or "new",
+                data.email or "", data.source_id, assigned_to, attended_by,
+                data.status or "new",
                 data.budget or "", data.preferred_location or "",
                 data.property_type or "", data.bhk or "", data.notes or "",
                 data.referrer_name or "", data.referrer_phone or "",
@@ -635,11 +672,27 @@ def update_lead(lead_id: str, data: LeadUpdate) -> dict:
         "site_visit_scheduled", "site_visit_done", "feedback",
     }
     with db() as conn:
-        existing = row(conn, "SELECT status FROM leads WHERE id = %s", (lead_id,))
+        existing = row(conn, "SELECT status, assigned_to FROM leads WHERE id = %s", (lead_id,))
         if not existing:
             raise HTTPException(status_code=404, detail="Lead not found")
 
         update_dict = {k: v for k, v in data.dict(exclude_none=True).items() if k in allowed}
+        missing = []
+        if "assigned_to" in update_dict:
+            assigned_to = resolve_user_id(conn, update_dict["assigned_to"])
+            if assigned_to:
+                update_dict["assigned_to"] = assigned_to
+            else:
+                missing.append("Assigned To")
+        if "attended_by" in update_dict:
+            fallback_assignee = update_dict.get("assigned_to") or existing["assigned_to"]
+            update_dict["attended_by"] = str(update_dict["attended_by"] or "").strip() or fallback_assignee
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": "Lead validation failed", "missing": missing},
+            )
+
         if not update_dict:
             # No lead fields to update — still may need to log activity (e.g. note added)
             lead = row(conn, f"SELECT {LEAD_COLS} FROM leads WHERE id = %s", (lead_id,))

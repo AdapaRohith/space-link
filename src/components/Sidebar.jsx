@@ -16,7 +16,7 @@ const NAV_ITEMS = [
 
 const ROLE_LABELS = {
   admin: 'Administrator',
-  sales: 'Sales Executive',
+  sales: 'Sales Team',
   receptionist: 'Front Desk',
 };
 

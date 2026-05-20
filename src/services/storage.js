@@ -15,7 +15,14 @@ async function request(path, options = {}) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     const detail = typeof err.detail === 'string' ? err.detail : err.detail?.message;
-    throw new Error(err.error || detail || 'Request failed');
+    const missing = Array.isArray(err.detail?.missing) ? `: ${err.detail.missing.join(', ')}` : '';
+    const rowErrors = Array.isArray(err.detail?.errors)
+      ? `: ${err.detail.errors.map(item => `row ${item.row} ${item.missing?.join(', ') || ''}`.trim()).join('; ')}`
+      : '';
+    const error = new Error(`${err.error || detail || 'Request failed'}${missing || rowErrors}`);
+    error.status = res.status;
+    error.detail = err.detail;
+    throw error;
   }
   return res.json();
 }

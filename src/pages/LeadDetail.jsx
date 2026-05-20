@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Edit3, Trash2, MapPin, Phone,
   DollarSign, Calendar, Save,
@@ -16,11 +16,36 @@ import ActivityTimeline from '../components/ActivityTimeline';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { LEAD_STATUSES, PROPERTY_TYPES, BHK_OPTIONS } from '../data/seedData';
+import { COUNTRY_CODES } from '../data/countryCodes';
+import PrettySelect from '../components/PrettySelect';
 import './LeadDetail.css';
+
+const BUDGET_OPTIONS = ['<50L', '50L-1Cr', '1Cr-1.5cr', '1.5-2', '2-2.5', '2.5-3', '3-3.5', '3.5-4', '4-5', '5-6', '6-7cr'];
+const BUDGET_SELECT_OPTIONS = BUDGET_OPTIONS.map(option => ({ value: option, label: option }));
+const today = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+};
+const currentTime = () => new Date().toTimeString().slice(0, 5);
+
+function getEditableNameFields(lead) {
+  if (lead.first_name || lead.last_name) {
+    return {
+      first_name: lead.first_name || '',
+      last_name: lead.last_name || '',
+    };
+  }
+  const parts = String(lead.lead_name || '').trim().split(/\s+/).filter(Boolean);
+  return {
+    first_name: parts[0] || '',
+    last_name: parts.slice(1).join(' '),
+  };
+}
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const session = getSession();
 
   const [users, setUsers] = useState([]);
@@ -40,8 +65,8 @@ export default function LeadDetail() {
   // Forms
   const [statusForm, setStatusForm] = useState({ status: '', note: '' });
   const [visitForm, setVisitForm] = useState({
-    visit_date: new Date().toISOString().split('T')[0],
-    visit_time: new Date().toTimeString().slice(0, 5),
+    visit_date: today(),
+    visit_time: currentTime(),
     site_location: 'Level Up Tower - Main Site', notes: '',
   });
   const [editForm, setEditForm] = useState({});
@@ -62,7 +87,11 @@ export default function LeadDetail() {
       const l = await getLeadById(id);
       if (!l) { navigate('/leads'); return; }
       setLead(l);
-      setEditForm({ ...l });
+      setEditForm({ ...l, ...getEditableNameFields(l) });
+      if (location.state?.openEdit) {
+        setShowEditModal(true);
+        navigate(`/leads/${id}`, { replace: true, state: {} });
+      }
 
       const [v, a] = await Promise.all([getVisitsByLead(id), getActivitiesByLead(id)]);
       setVisits(v);
@@ -84,8 +113,8 @@ export default function LeadDetail() {
     await addVisit({ lead_id: id, ...visitForm }, session.userId);
     setShowVisitModal(false);
     setVisitForm({
-      visit_date: new Date().toISOString().split('T')[0],
-      visit_time: new Date().toTimeString().slice(0, 5),
+      visit_date: today(),
+      visit_time: currentTime(),
       site_location: 'Level Up Tower - Main Site', notes: '',
     });
     await loadData();
@@ -101,7 +130,7 @@ export default function LeadDetail() {
       email: editForm.email,
       assigned_to: editForm.assigned_to,
       attended_by: editForm.attended_by,
-      tele_caller_name: editForm.tele_caller_name,
+      tele_caller_name: '',
       requirement_summary: editForm.requirement_summary,
       site_visit_scheduled: editForm.site_visit_scheduled,
       site_visit_done: editForm.site_visit_done,
@@ -212,7 +241,6 @@ export default function LeadDetail() {
                 <div className="detail-field"><span className="detail-label">Source</span><span className="detail-value">{getSourceName(lead.source_id, sources)}</span></div>
                 <div className="detail-field"><span className="detail-label">Assigned To</span><span className="detail-value">{getUserName(lead.assigned_to, users)}</span></div>
                 {lead.attended_by && <div className="detail-field"><span className="detail-label">Attended By</span><span className="detail-value">{getUserName(lead.attended_by, users)}</span></div>}
-                {lead.tele_caller_name && <div className="detail-field"><span className="detail-label">Tele Caller</span><span className="detail-value">{lead.tele_caller_name}</span></div>}
               </div>
             </div>
 
@@ -235,16 +263,6 @@ export default function LeadDetail() {
               </div>
             )}
 
-            {(lead.feedback || lead.site_visit_scheduled || lead.site_visit_done) && (
-              <div className="card detail-card">
-                <h4 className="detail-card-title"><MessageSquare size={16} /> Visit Feedback</h4>
-                <div className="detail-fields">
-                  <div className="detail-field"><span className="detail-label">Site Visit Scheduled</span><span className="detail-value">{lead.site_visit_scheduled ? 'Yes' : 'No'}</span></div>
-                  <div className="detail-field"><span className="detail-label">Site Visit Done</span><span className="detail-value">{lead.site_visit_done ? 'Yes' : 'No'}</span></div>
-                </div>
-                {lead.feedback && <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginTop: 'var(--space-3)' }}>{lead.feedback}</p>}
-              </div>
-            )}
           </div>
 
           <div className="detail-sidebar">
@@ -366,7 +384,15 @@ export default function LeadDetail() {
         </div>
         <div className="form-row">
           <div className="form-group"><label>Country Code</label>
-            <input type="text" value={editForm.phone_country_code || ''} onChange={e => setEditForm(p => ({ ...p, phone_country_code: e.target.value }))} /></div>
+            <PrettySelect
+              value={editForm.phone_country_code || '91'}
+              onChange={value => setEditForm(p => ({ ...p, phone_country_code: value }))}
+              options={COUNTRY_CODES}
+              searchable
+              searchPlaceholder="Search country or code"
+              className="country-code-select"
+              compactCode
+            /></div>
           <div className="form-group"><label>Phone</label>
             <input type="tel" value={editForm.phone || ''} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} /></div>
         </div>
@@ -381,14 +407,16 @@ export default function LeadDetail() {
             <select value={editForm.assigned_to || ''} onChange={e => setEditForm(p => ({ ...p, assigned_to: e.target.value }))}>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
           <div className="form-group"><label>Attended / Handled by</label>
-            <select value={editForm.attended_by || ''} onChange={e => setEditForm(p => ({ ...p, attended_by: e.target.value }))}>
-              <option value="">Select</option>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+            <input type="text" value={editForm.attended_by || ''} onChange={e => setEditForm(p => ({ ...p, attended_by: e.target.value }))} /></div>
         </div>
         <div className="form-row">
-          <div className="form-group"><label>Tele Caller Name</label>
-            <input type="text" value={editForm.tele_caller_name || ''} onChange={e => setEditForm(p => ({ ...p, tele_caller_name: e.target.value }))} /></div>
           <div className="form-group"><label>Budget</label>
-            <input type="text" value={editForm.budget || ''} onChange={e => setEditForm(p => ({ ...p, budget: e.target.value }))} /></div>
+            <PrettySelect
+              value={editForm.budget || ''}
+              onChange={value => setEditForm(p => ({ ...p, budget: value }))}
+              options={BUDGET_SELECT_OPTIONS}
+              placeholder="Select budget"
+            /></div>
         </div>
         <div className="form-group"><label>Requirement Summary</label>
           <textarea value={editForm.requirement_summary || ''} onChange={e => setEditForm(p => ({ ...p, requirement_summary: e.target.value }))} rows={3} /></div>
@@ -402,20 +430,6 @@ export default function LeadDetail() {
         </div>
         <div className="form-group"><label>Preferred Location</label>
           <input type="text" value={editForm.preferred_location || ''} onChange={e => setEditForm(p => ({ ...p, preferred_location: e.target.value }))} /></div>
-        <div className="form-row">
-          <label className="checkbox-row">
-            <input type="checkbox" checked={!!editForm.site_visit_scheduled}
-              onChange={e => setEditForm(p => ({ ...p, site_visit_scheduled: e.target.checked }))} />
-            Site Visit Scheduled
-          </label>
-          <label className="checkbox-row">
-            <input type="checkbox" checked={!!editForm.site_visit_done}
-              onChange={e => setEditForm(p => ({ ...p, site_visit_done: e.target.checked }))} />
-            Site Visit Done
-          </label>
-        </div>
-        <div className="form-group"><label>Feedback</label>
-          <textarea value={editForm.feedback || ''} onChange={e => setEditForm(p => ({ ...p, feedback: e.target.value }))} rows={3} /></div>
         <div className="form-group"><label>Notes</label>
           <textarea value={editForm.notes || ''} onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} rows={4} /></div>
       </Modal>}

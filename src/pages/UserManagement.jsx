@@ -121,7 +121,7 @@ export default function UserManagement() {
     receptionist: { bg: 'rgba(34, 197, 94, 0.12)', color: '#4ade80' },
   };
 
-  const roleLabels = { admin: 'Admin', sales: 'Sales Executive', receptionist: 'Receptionist' };
+  const roleLabels = { admin: 'Admin', sales: 'Sales Team', receptionist: 'Receptionist' };
   const roleTabs = [
     { value: 'all', label: 'All', count: users.length },
     { value: 'admin', label: 'Admin', count: users.filter(u => u.role === 'admin').length },
@@ -294,7 +294,7 @@ export default function UserManagement() {
             <label>Role</label>
             <select value={form.role} onChange={e => set('role', e.target.value)}>
               <option value="admin">Admin</option>
-              <option value="sales">Sales Executive</option>
+              <option value="sales">Sales Team</option>
               <option value="receptionist">Receptionist</option>
             </select>
           </div>

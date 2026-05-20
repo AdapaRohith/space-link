@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 9px 18px;
+  padding: 8px 14px;
   font-family: var(--font-family);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
@@ -100,7 +100,7 @@
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-6);
+  padding: var(--space-5);
   transition: border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
@@ -267,7 +267,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -276,32 +276,32 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.modal-body { padding: var(--space-6); }
+.modal-body { padding: var(--space-5); }
 
 .modal-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--color-border);
 }
 
 /* === Form Groups === */
-.form-group { margin-bottom: var(--space-5); }
+.form-group { margin-bottom: var(--space-3); }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .form-section {
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .form-section-title {
@@ -310,7 +310,7 @@
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-3);
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -336,9 +336,178 @@
   color: var(--color-danger);
 }
 
+/* === Pretty Select === */
+.pretty-select {
+  position: relative;
+  width: 100%;
+}
+
+.pretty-select-trigger {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 8px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.pretty-select.open .pretty-select-trigger,
+.pretty-select-trigger:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-card-hover);
+}
+
+.pretty-select.open .pretty-select-trigger {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px var(--color-primary-dim);
+}
+
+.pretty-select-value,
+.pretty-select-placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pretty-select-value strong {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.pretty-select-placeholder {
+  color: var(--color-text-muted);
+}
+
+.pretty-select-chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.pretty-select.open .pretty-select-chevron {
+  transform: rotate(180deg);
+}
+
+.pretty-select-menu {
+  position: absolute;
+  z-index: var(--z-modal);
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  animation: fadeInDown 140ms ease both;
+}
+
+.pretty-select-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 9px;
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-input);
+  color: var(--color-text-muted);
+}
+
+.pretty-select-search input {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  min-width: 0;
+  background: transparent;
+  font-size: var(--font-size-sm);
+}
+
+.pretty-select-search input:focus {
+  border: none;
+  box-shadow: none;
+}
+
+.pretty-select-list {
+  max-height: 238px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pretty-select-option {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 8px 9px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pretty-select-option:hover {
+  background: var(--color-bg-card-hover);
+  color: var(--color-text-primary);
+}
+
+.pretty-select-option.selected {
+  background: var(--color-primary-dim);
+  color: var(--color-primary);
+}
+
+.pretty-select-option > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pretty-select-option strong {
+  flex-shrink: 0;
+  color: var(--color-primary);
+  min-width: 46px;
+}
+
+.pretty-select-empty {
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.country-code-select .pretty-select-trigger {
+  padding-inline: 10px;
+}
+
+.country-code-select .pretty-select-menu {
+  width: min(360px, 78vw);
+}
+
 /* === Page Layout === */
 .page {
-  padding: var(--space-8);
+  padding: var(--space-6);
   max-width: var(--max-content-width);
   animation: fadeInUp 320ms ease;
 }
@@ -347,9 +516,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-8);
+  margin-bottom: var(--space-5);
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .page-title {
@@ -362,7 +531,7 @@
 .page-subtitle {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 /* === Empty State === */
