@@ -1,7 +1,7 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, UserPlus, ClipboardList, Building2,
-  LogOut, X, Shield
+  LayoutDashboard, Users, UserPlus, ClipboardList,
+  LogOut, X, Shield, Moon, Sun
 } from 'lucide-react';
 import { getSession, logout } from '../services/authService';
 import spaceLinkLogo from '../assets/space-link-logo.png';
@@ -11,7 +11,6 @@ const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
   { path: '/leads', label: 'All Leads', icon: ClipboardList, roles: ['admin', 'sales', 'receptionist'] },
   { path: '/leads/new', label: 'Add Lead', icon: UserPlus, roles: ['admin', 'sales', 'receptionist'] },
-  { path: '/walkins', label: 'Walk-In Log', icon: Building2, roles: ['admin', 'receptionist'] },
   { path: '/users', label: 'Team', icon: Users, roles: ['admin'] },
 ];
 
@@ -21,9 +20,8 @@ const ROLE_LABELS = {
   receptionist: 'Front Desk',
 };
 
-export default function Sidebar({ isOpen, onToggle }) {
+export default function Sidebar({ isOpen, onToggle, amoledMode, onThemeToggle }) {
   const session = getSession();
-  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -39,9 +37,6 @@ export default function Sidebar({ isOpen, onToggle }) {
       <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-brand">
           <img src={spaceLinkLogo} alt="Space Link" className="sidebar-logo-img" />
-          <div className="sidebar-brand-text">
-            <span className="sidebar-brand-name">SPACE LINK</span>
-          </div>
           <button className="sidebar-close-btn" onClick={onToggle} aria-label="Close menu">
             <X size={18} />
           </button>
@@ -63,6 +58,14 @@ export default function Sidebar({ isOpen, onToggle }) {
         </nav>
 
         <div className="sidebar-footer">
+          <button
+            className="sidebar-theme-toggle"
+            onClick={onThemeToggle}
+            title={amoledMode ? 'Use light mode' : 'Use AMOLED dark mode'}
+          >
+            {amoledMode ? <Sun size={16} /> : <Moon size={16} />}
+            <span>{amoledMode ? 'Light Mode' : 'AMOLED Dark'}</span>
+          </button>
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">
               {session?.name?.charAt(0)?.toUpperCase()}

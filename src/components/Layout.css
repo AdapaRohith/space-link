@@ -15,6 +15,7 @@
 .main-content {
   flex: 1;
   overflow-x: hidden;
+  background: var(--color-bg);
 }
 
 /* ── Mobile Top Bar ── */
@@ -24,8 +25,8 @@
   justify-content: space-between;
   padding: 0 var(--space-4);
   height: 56px;
-  background: #111827;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
   z-index: var(--z-header);
@@ -34,7 +35,7 @@
 .topbar-menu {
   background: none;
   border: none;
-  color: #9CA3AF;
+  color: var(--color-text-primary);
   cursor: pointer;
   padding: 6px;
   border-radius: var(--radius-sm);
@@ -42,13 +43,33 @@
   align-items: center;
 }
 
-.topbar-menu:hover { color: #F9FAFB; }
+.topbar-menu:hover { color: var(--color-primary); }
 
 .topbar-brand {
   font-family: var(--font-family-brand);
   font-size: 0.8rem;
   letter-spacing: 0.12em;
-  color: var(--color-gold);
+  color: var(--color-text-primary);
+}
+
+.topbar-theme-toggle {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.topbar-theme-toggle:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-primary);
+  background: var(--color-bg-card-hover);
 }
 
 @media (max-width: 768px) {

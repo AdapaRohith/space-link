@@ -54,6 +54,21 @@
 
 .detail-value.accent { color: var(--color-gold); font-weight: var(--font-weight-semibold); }
 
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent-500);
+}
+
 @media (max-width: 900px) {
   .detail-grid { grid-template-columns: 1fr; }
 }

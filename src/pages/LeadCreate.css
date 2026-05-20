@@ -11,6 +11,22 @@
 
 .lead-form-sidebar { display: flex; flex-direction: column; gap: 0; }
 
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  margin-bottom: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent-500);
+}
+
 .form-actions-sticky {
   position: sticky;
   bottom: var(--space-6);

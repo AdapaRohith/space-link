@@ -14,7 +14,8 @@ async function request(path, options = {}) {
   const res = await fetch(url, config);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || 'Request failed');
+    const detail = typeof err.detail === 'string' ? err.detail : err.detail?.message;
+    throw new Error(err.error || detail || 'Request failed');
   }
   return res.json();
 }

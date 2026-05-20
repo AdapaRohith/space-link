@@ -15,6 +15,7 @@ import os
 import re
 import uuid
 from contextlib import asynccontextmanager, contextmanager
+from datetime import datetime
 from typing import Any, Optional
 
 import psycopg2
@@ -85,6 +86,18 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
+def parse_import_date(value: str | None):
+    if not value:
+        return None
+    text = value.strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d %b %Y", "%d %B %Y"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            pass
+    return None
+
+
 # ── App ────────────────────────────────────────────────────────────────────────
 
 # Covers: production domain, localhost dev, Vercel/Cloudflare previews
@@ -99,6 +112,13 @@ CORS_ORIGIN_RE = re.compile(
 async def lifespan(app: FastAPI):
     with db() as conn:
         execute(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS pending BOOLEAN NOT NULL DEFAULT FALSE")
+        execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS phone_country_code TEXT NOT NULL DEFAULT ''")
+        execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS data_source TEXT NOT NULL DEFAULT ''")
+        execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS tele_caller_name TEXT NOT NULL DEFAULT ''")
+        execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS requirement_summary TEXT NOT NULL DEFAULT ''")
+        execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS site_visit_scheduled BOOLEAN NOT NULL DEFAULT FALSE")
+        execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS site_visit_done BOOLEAN NOT NULL DEFAULT FALSE")
+        execute(conn, "ALTER TABLE leads ADD COLUMN IF NOT EXISTS feedback TEXT NOT NULL DEFAULT ''")
     yield
 
 
@@ -145,6 +165,8 @@ LEAD_COLS = (
     "id, lead_name, phone, alternate_phone, email, source_id, "
     "assigned_to, attended_by, status, budget, preferred_location, "
     "property_type, bhk, notes, referrer_name, referrer_phone, "
+    "phone_country_code, data_source, tele_caller_name, requirement_summary, "
+    "site_visit_scheduled, site_visit_done, feedback, "
     "created_by, created_at, updated_at"
 )
 
@@ -341,6 +363,7 @@ def create_source(data: SourceCreate) -> dict:
 
 
 class LeadCreate(BaseModel):
+    date: Optional[str] = ""
     lead_name: str
     phone: str
     alternate_phone: Optional[str] = ""
@@ -356,6 +379,13 @@ class LeadCreate(BaseModel):
     notes: Optional[str] = ""
     referrer_name: Optional[str] = ""
     referrer_phone: Optional[str] = ""
+    phone_country_code: Optional[str] = ""
+    data_source: Optional[str] = ""
+    tele_caller_name: Optional[str] = ""
+    requirement_summary: Optional[str] = ""
+    site_visit_scheduled: Optional[bool] = False
+    site_visit_done: Optional[bool] = False
+    feedback: Optional[str] = ""
     created_by: Optional[str] = ""
     custom_source: Optional[str] = ""  # ignored server-side; caller resolves before posting
 
@@ -376,9 +406,55 @@ class LeadUpdate(BaseModel):
     notes: Optional[str] = None
     referrer_name: Optional[str] = None
     referrer_phone: Optional[str] = None
+    phone_country_code: Optional[str] = None
+    data_source: Optional[str] = None
+    tele_caller_name: Optional[str] = None
+    requirement_summary: Optional[str] = None
+    site_visit_scheduled: Optional[bool] = None
+    site_visit_done: Optional[bool] = None
+    feedback: Optional[str] = None
     # audit fields — not written to leads table
     userId: Optional[str] = None
     status_note: Optional[str] = None
+
+
+class LeadBulkCreate(BaseModel):
+    leads: list[LeadCreate]
+    created_by: Optional[str] = ""
+
+
+def validate_single_lead_create(data: LeadCreate):
+    required_fields = [
+        ("lead_name", "Name"),
+        ("phone", "Phone No."),
+        ("alternate_phone", "Alternate Number"),
+        ("phone_country_code", "Country Code"),
+        ("source_id", "Lead Source"),
+        ("assigned_to", "Assigned To"),
+        ("attended_by", "Attended / Handled by"),
+        ("tele_caller_name", "Tele Caller Name"),
+        ("requirement_summary", "Requirement Summary"),
+        ("budget", "Budget"),
+        ("preferred_location", "Preferred Location"),
+        ("property_type", "Property Type"),
+        ("bhk", "BHK Requirement"),
+        ("notes", "Notes"),
+        ("feedback", "Feedback"),
+    ]
+    missing = [
+        label for field, label in required_fields
+        if not str(getattr(data, field, "") or "").strip()
+    ]
+    if data.source_id == "src_reference":
+        if not str(data.referrer_name or "").strip():
+            missing.append("Referrer Name")
+        if not str(data.referrer_phone or "").strip():
+            missing.append("Referrer Phone")
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "Lead validation failed", "missing": missing},
+        )
 
 
 # Order matters: specific paths before /{lead_id}
@@ -420,6 +496,65 @@ def get_counts_by_assignee() -> dict:
     return {r["assigned_to"]: r["count"] for r in result}
 
 
+@app.post("/api/leads/bulk")
+def create_leads_bulk(data: LeadBulkCreate) -> dict:
+    if not data.leads:
+        raise HTTPException(status_code=400, detail="No leads supplied")
+
+    errors = []
+    for index, lead_data in enumerate(data.leads, start=2):
+        missing = []
+        if not lead_data.lead_name.strip():
+            missing.append("Name")
+        if not lead_data.phone.strip():
+            missing.append("Phone No.")
+        if not lead_data.source_id.strip():
+            missing.append("Data Source")
+        if not lead_data.assigned_to.strip():
+            missing.append("Attended / Handled by")
+        if missing:
+            errors.append({"row": index, "missing": missing})
+
+    if errors:
+        raise HTTPException(status_code=400, detail={"message": "Import validation failed", "errors": errors})
+
+    created = []
+    created_by = data.created_by or ""
+    with db() as conn:
+        for lead_data in data.leads:
+            lead_id = new_id()
+            actor = lead_data.created_by or created_by
+            lead = row(
+                conn,
+                f"""INSERT INTO leads (
+                    id, lead_name, phone, alternate_phone, email, source_id,
+                    assigned_to, attended_by, status, budget, preferred_location,
+                    property_type, bhk, notes, referrer_name, referrer_phone,
+                    phone_country_code, data_source, tele_caller_name, requirement_summary,
+                    site_visit_scheduled, site_visit_done, feedback, created_by, created_at
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s, NOW()))
+                RETURNING {LEAD_COLS}""",
+                (
+                    lead_id, lead_data.lead_name, lead_data.phone,
+                    lead_data.alternate_phone or "", lead_data.email or "",
+                    lead_data.source_id, lead_data.assigned_to,
+                    lead_data.attended_by or lead_data.assigned_to,
+                    lead_data.status or "new", lead_data.budget or "",
+                    lead_data.preferred_location or "", lead_data.property_type or "",
+                    lead_data.bhk or "", lead_data.notes or "",
+                    lead_data.referrer_name or "", lead_data.referrer_phone or "",
+                    lead_data.phone_country_code or "", lead_data.data_source or "",
+                    lead_data.tele_caller_name or "", lead_data.requirement_summary or "",
+                    bool(lead_data.site_visit_scheduled), bool(lead_data.site_visit_done),
+                    lead_data.feedback or "", actor, parse_import_date(lead_data.date),
+                ),
+            )
+            _log_activity(conn, lead_id, "lead_created", f"Lead imported: {lead_data.lead_name}", actor)
+            created.append(lead)
+
+    return {"imported": len(created), "leads": created}
+
+
 @app.get("/api/leads")
 def get_leads(
     search: Optional[str] = None,
@@ -459,6 +594,7 @@ def get_lead(lead_id: str) -> dict:
 
 @app.post("/api/leads")
 def create_lead(data: LeadCreate) -> dict:
+    validate_single_lead_create(data)
     lead_id = new_id()
     with db() as conn:
         lead = row(
@@ -466,8 +602,10 @@ def create_lead(data: LeadCreate) -> dict:
             f"""INSERT INTO leads (
                 id, lead_name, phone, alternate_phone, email, source_id,
                 assigned_to, attended_by, status, budget, preferred_location,
-                property_type, bhk, notes, referrer_name, referrer_phone, created_by
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                property_type, bhk, notes, referrer_name, referrer_phone,
+                phone_country_code, data_source, tele_caller_name, requirement_summary,
+                site_visit_scheduled, site_visit_done, feedback, created_by
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING {LEAD_COLS}""",
             (
                 lead_id, data.lead_name, data.phone, data.alternate_phone or "",
@@ -475,7 +613,11 @@ def create_lead(data: LeadCreate) -> dict:
                 data.attended_by or "", data.status or "new",
                 data.budget or "", data.preferred_location or "",
                 data.property_type or "", data.bhk or "", data.notes or "",
-                data.referrer_name or "", data.referrer_phone or "", data.created_by or "",
+                data.referrer_name or "", data.referrer_phone or "",
+                data.phone_country_code or "", data.data_source or "",
+                data.tele_caller_name or "", data.requirement_summary or "",
+                bool(data.site_visit_scheduled), bool(data.site_visit_done),
+                data.feedback or "", data.created_by or "",
             ),
         )
         _log_activity(conn, lead_id, "lead_created", f"Lead created: {data.lead_name}", data.created_by)
@@ -489,6 +631,8 @@ def update_lead(lead_id: str, data: LeadUpdate) -> dict:
         "lead_name", "phone", "alternate_phone", "email", "source_id",
         "assigned_to", "attended_by", "status", "budget", "preferred_location",
         "property_type", "bhk", "notes", "referrer_name", "referrer_phone",
+        "phone_country_code", "data_source", "tele_caller_name", "requirement_summary",
+        "site_visit_scheduled", "site_visit_done", "feedback",
     }
     with db() as conn:
         existing = row(conn, "SELECT status FROM leads WHERE id = %s", (lead_id,))

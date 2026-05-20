@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Edit3, Trash2, MapPin, Phone, Mail,
-  DollarSign, Building2, Calendar, Clock, Save, X,
+  ArrowLeft, Edit3, Trash2, MapPin, Phone,
+  DollarSign, Calendar, Save,
   UserCheck, MessageSquare, MessageCircle, Plus, RefreshCw
 } from 'lucide-react';
 import { getLeadById, updateLead, deleteLead } from '../services/leadService';
@@ -96,10 +96,16 @@ export default function LeadDetail() {
       first_name: editForm.first_name,
       last_name: editForm.last_name,
       phone: editForm.phone,
+      phone_country_code: editForm.phone_country_code,
       alternate_phone: editForm.alternate_phone,
       email: editForm.email,
       assigned_to: editForm.assigned_to,
       attended_by: editForm.attended_by,
+      tele_caller_name: editForm.tele_caller_name,
+      requirement_summary: editForm.requirement_summary,
+      site_visit_scheduled: editForm.site_visit_scheduled,
+      site_visit_done: editForm.site_visit_done,
+      feedback: editForm.feedback,
       budget: editForm.budget,
       preferred_location: editForm.preferred_location,
       property_type: editForm.property_type,
@@ -199,12 +205,14 @@ export default function LeadDetail() {
             <div className="card detail-card">
               <h4 className="detail-card-title"><Phone size={16} /> Contact Information</h4>
               <div className="detail-fields">
+                {lead.phone_country_code && <div className="detail-field"><span className="detail-label">Country Code</span><span className="detail-value">{lead.phone_country_code}</span></div>}
                 <div className="detail-field"><span className="detail-label">Phone</span><span className="detail-value">{lead.phone}</span></div>
                 {lead.alternate_phone && <div className="detail-field"><span className="detail-label">Alt Phone</span><span className="detail-value">{lead.alternate_phone}</span></div>}
                 {lead.email && <div className="detail-field"><span className="detail-label">Email</span><span className="detail-value">{lead.email}</span></div>}
                 <div className="detail-field"><span className="detail-label">Source</span><span className="detail-value">{getSourceName(lead.source_id, sources)}</span></div>
                 <div className="detail-field"><span className="detail-label">Assigned To</span><span className="detail-value">{getUserName(lead.assigned_to, users)}</span></div>
                 {lead.attended_by && <div className="detail-field"><span className="detail-label">Attended By</span><span className="detail-value">{getUserName(lead.attended_by, users)}</span></div>}
+                {lead.tele_caller_name && <div className="detail-field"><span className="detail-label">Tele Caller</span><span className="detail-value">{lead.tele_caller_name}</span></div>}
               </div>
             </div>
 
@@ -226,6 +234,17 @@ export default function LeadDetail() {
                 <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{lead.notes}</p>
               </div>
             )}
+
+            {(lead.feedback || lead.site_visit_scheduled || lead.site_visit_done) && (
+              <div className="card detail-card">
+                <h4 className="detail-card-title"><MessageSquare size={16} /> Visit Feedback</h4>
+                <div className="detail-fields">
+                  <div className="detail-field"><span className="detail-label">Site Visit Scheduled</span><span className="detail-value">{lead.site_visit_scheduled ? 'Yes' : 'No'}</span></div>
+                  <div className="detail-field"><span className="detail-label">Site Visit Done</span><span className="detail-value">{lead.site_visit_done ? 'Yes' : 'No'}</span></div>
+                </div>
+                {lead.feedback && <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginTop: 'var(--space-3)' }}>{lead.feedback}</p>}
+              </div>
+            )}
           </div>
 
           <div className="detail-sidebar">
@@ -234,11 +253,12 @@ export default function LeadDetail() {
               <h4 className="detail-card-title"><DollarSign size={16} /> Requirements</h4>
               <div className="detail-fields">
                 {lead.budget && <div className="detail-field"><span className="detail-label">Budget</span><span className="detail-value accent">{lead.budget}</span></div>}
+                {lead.requirement_summary && <div className="detail-field"><span className="detail-label">Summary</span><span className="detail-value">{lead.requirement_summary}</span></div>}
                 {lead.preferred_location && <div className="detail-field"><span className="detail-label">Location</span><span className="detail-value">{lead.preferred_location}</span></div>}
                 {lead.property_type && <div className="detail-field"><span className="detail-label">Type</span><span className="detail-value">{lead.property_type}</span></div>}
                 {lead.bhk && <div className="detail-field"><span className="detail-label">BHK</span><span className="detail-value">{lead.bhk}</span></div>}
               </div>
-              {!lead.budget && !lead.property_type && (
+              {!lead.budget && !lead.property_type && !lead.requirement_summary && (
                 <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>No requirements recorded</p>
               )}
             </div>
@@ -345,6 +365,8 @@ export default function LeadDetail() {
             <input type="text" value={editForm.last_name || ''} onChange={e => setEditForm(p => ({ ...p, last_name: e.target.value }))} /></div>
         </div>
         <div className="form-row">
+          <div className="form-group"><label>Country Code</label>
+            <input type="text" value={editForm.phone_country_code || ''} onChange={e => setEditForm(p => ({ ...p, phone_country_code: e.target.value }))} /></div>
           <div className="form-group"><label>Phone</label>
             <input type="tel" value={editForm.phone || ''} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} /></div>
         </div>
@@ -358,9 +380,18 @@ export default function LeadDetail() {
           <div className="form-group"><label>Assigned To</label>
             <select value={editForm.assigned_to || ''} onChange={e => setEditForm(p => ({ ...p, assigned_to: e.target.value }))}>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+          <div className="form-group"><label>Attended / Handled by</label>
+            <select value={editForm.attended_by || ''} onChange={e => setEditForm(p => ({ ...p, attended_by: e.target.value }))}>
+              <option value="">Select</option>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+        </div>
+        <div className="form-row">
+          <div className="form-group"><label>Tele Caller Name</label>
+            <input type="text" value={editForm.tele_caller_name || ''} onChange={e => setEditForm(p => ({ ...p, tele_caller_name: e.target.value }))} /></div>
           <div className="form-group"><label>Budget</label>
             <input type="text" value={editForm.budget || ''} onChange={e => setEditForm(p => ({ ...p, budget: e.target.value }))} /></div>
         </div>
+        <div className="form-group"><label>Requirement Summary</label>
+          <textarea value={editForm.requirement_summary || ''} onChange={e => setEditForm(p => ({ ...p, requirement_summary: e.target.value }))} rows={3} /></div>
         <div className="form-row">
           <div className="form-group"><label>Property Type</label>
             <select value={editForm.property_type || ''} onChange={e => setEditForm(p => ({ ...p, property_type: e.target.value }))}>
@@ -371,6 +402,20 @@ export default function LeadDetail() {
         </div>
         <div className="form-group"><label>Preferred Location</label>
           <input type="text" value={editForm.preferred_location || ''} onChange={e => setEditForm(p => ({ ...p, preferred_location: e.target.value }))} /></div>
+        <div className="form-row">
+          <label className="checkbox-row">
+            <input type="checkbox" checked={!!editForm.site_visit_scheduled}
+              onChange={e => setEditForm(p => ({ ...p, site_visit_scheduled: e.target.checked }))} />
+            Site Visit Scheduled
+          </label>
+          <label className="checkbox-row">
+            <input type="checkbox" checked={!!editForm.site_visit_done}
+              onChange={e => setEditForm(p => ({ ...p, site_visit_done: e.target.checked }))} />
+            Site Visit Done
+          </label>
+        </div>
+        <div className="form-group"><label>Feedback</label>
+          <textarea value={editForm.feedback || ''} onChange={e => setEditForm(p => ({ ...p, feedback: e.target.value }))} rows={3} /></div>
         <div className="form-group"><label>Notes</label>
           <textarea value={editForm.notes || ''} onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} rows={4} /></div>
       </Modal>}

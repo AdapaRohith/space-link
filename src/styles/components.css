@@ -69,7 +69,7 @@
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: rgba(0,0,0,0.05);
+  background: var(--color-bg-muted);
   color: var(--color-text-primary);
 }
 
@@ -179,7 +179,7 @@
   cursor: pointer;
 }
 
-.table tbody tr:hover { background: #F9FAFB; }
+.table tbody tr:hover { background: var(--color-bg-card-hover); }
 .table tbody tr:last-child td { border-bottom: none; }
 
 /* === Lead Name Cell === */
@@ -490,7 +490,7 @@
 
 .clear-btn:hover {
   color: var(--color-text-primary);
-  background: rgba(0,0,0,0.05);
+  background: var(--color-bg-muted);
 }
 
 /* === Filter Bar === */

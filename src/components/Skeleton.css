@@ -1,0 +1,81 @@
+/* ===== SKELETON LOADING ANIMATIONS ===== */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton-bar {
+  background: linear-gradient(
+    90deg,
+    var(--color-border) 0%,
+    var(--color-bg-muted) 20%,
+    var(--color-border) 40%,
+    var(--color-border) 100%
+  );
+  background-size: 1000px 100%;
+  animation: skeleton-shimmer 1.2s infinite;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.skeleton-card {
+  background: var(--color-bg-card);
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+}
+
+.skeleton-table {
+  background: var(--color-bg-card);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.skeleton-table-header {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+.skeleton-table-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.skeleton-table-row:last-child {
+  border-bottom: none;
+}
+
+.skeleton-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.skeleton-dashboard {
+  padding: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .skeleton-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .skeleton-table-header,
+  .skeleton-table-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

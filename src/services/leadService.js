@@ -39,8 +39,12 @@ export async function getLeadById(id) {
 
 // Mirrors to SLILG best-effort — does not block on failure.
 export async function createLead(leadData, userId) {
+  const normalizedLead = {
+    ...leadData,
+    lead_name: leadData.lead_name || [leadData.first_name, leadData.last_name].filter(Boolean).join(' ').trim(),
+  };
   const [primary] = await Promise.allSettled([
-    apiPost('/leads', { ...leadData, created_by: userId }),
+    apiPost('/leads', { ...normalizedLead, created_by: userId }),
     slilgCreateLead(leadData),
   ]);
 
@@ -48,8 +52,20 @@ export async function createLead(leadData, userId) {
   return primary.value;
 }
 
+export async function bulkCreateLeads(leads, userId) {
+  const normalizedLeads = leads.map(lead => ({
+    ...lead,
+    lead_name: lead.lead_name || [lead.first_name, lead.last_name].filter(Boolean).join(' ').trim(),
+  }));
+  return await apiPost('/leads/bulk', { leads: normalizedLeads, created_by: userId });
+}
+
 export async function updateLead(id, updates, userId) {
-  return await apiPut(`/leads/${id}`, { ...updates, userId });
+  const normalizedUpdates = { ...updates };
+  if (!normalizedUpdates.lead_name && (updates.first_name || updates.last_name)) {
+    normalizedUpdates.lead_name = [updates.first_name, updates.last_name].filter(Boolean).join(' ').trim();
+  }
+  return await apiPut(`/leads/${id}`, { ...normalizedUpdates, userId });
 }
 
 export async function deleteLead(id, userId) {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Users, Plus, Edit3, Shield, Phone, Mail, UserCheck,
-  UserX, ChevronDown, Save, Trash2, Clock, RefreshCw
+  UserX, Save, Trash2, Clock, RefreshCw
 } from 'lucide-react';
 import { getAllUsersIncludingInactive, addUser, updateUser, toggleUserActive, deleteUser, getSession, getPendingUsers, approveUser, rejectUser } from '../services/authService';
 import { apiGet } from '../services/storage';
@@ -18,6 +18,7 @@ export default function UserManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [deletingUser, setDeletingUser] = useState(null);
+  const [roleFilter, setRoleFilter] = useState('all');
   const [form, setForm] = useState({
     name: '', email: '', phone: '', role: 'sales', password_hash: '',
   });
@@ -121,6 +122,13 @@ export default function UserManagement() {
   };
 
   const roleLabels = { admin: 'Admin', sales: 'Sales Executive', receptionist: 'Receptionist' };
+  const roleTabs = [
+    { value: 'all', label: 'All', count: users.length },
+    { value: 'admin', label: 'Admin', count: users.filter(u => u.role === 'admin').length },
+    { value: 'sales', label: 'Sales', count: users.filter(u => u.role === 'sales').length },
+    { value: 'receptionist', label: 'Receptionist', count: users.filter(u => u.role === 'receptionist').length },
+  ];
+  const visibleUsers = roleFilter === 'all' ? users : users.filter(user => user.role === roleFilter);
 
   return (
     <div className="page">
@@ -185,9 +193,22 @@ export default function UserManagement() {
         </div>
       )}
 
+      <div className="role-filter-tabs">
+        {roleTabs.map(tab => (
+          <button
+            key={tab.value}
+            className={`role-filter-tab ${roleFilter === tab.value ? 'active' : ''}`}
+            onClick={() => setRoleFilter(tab.value)}
+          >
+            <span>{tab.label}</span>
+            <strong>{tab.count}</strong>
+          </button>
+        ))}
+      </div>
+
       {/* User Cards */}
       <div className="user-grid">
-        {users.map((user, i) => (
+        {visibleUsers.map((user, i) => (
           <div key={user.id} className={`user-card ${!user.active ? 'user-inactive' : ''} animate-fade-in-up`}
             style={{ animationDelay: `${i * 60}ms` }}>
             <div className="user-card-header">

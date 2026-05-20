@@ -3,10 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search, Plus, X, Download, Upload, ChevronLeft, ChevronRight, UserPlus, User, Phone
 } from 'lucide-react';
-import { createLead, filterLeads } from '../services/leadService';
+import { bulkCreateLeads, filterLeads } from '../services/leadService';
 import { getAllSources, getSourceName } from '../services/sourceService';
 import { getAllUsers, getUserName, getSession } from '../services/authService';
 import StatusBadge from '../components/StatusBadge';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { LEAD_STATUSES } from '../data/seedData';
 import './LeadList.css';
 
@@ -26,11 +27,55 @@ function matchesQuery(lead, query) {
 }
 
 const PAGE_SIZE = 15;
-const IMPORT_EXPORT_FIELDS = [
-  'lead_name', 'phone', 'alternate_phone', 'email', 'source_id', 'source',
-  'assigned_to', 'assigned_to_name', 'status', 'budget', 'preferred_location',
-  'property_type', 'bhk', 'notes', 'referrer_name', 'referrer_phone',
+const IMPORT_EXPORT_COLUMNS = [
+  { label: 'Date', key: 'date' },
+  { label: 'Name', key: 'lead_name' },
+  { label: 'Email Id', key: 'email' },
+  { label: 'Phone No.', key: 'phone' },
+  { label: 'Country Code', key: 'phone_country_code' },
+  { label: 'Data Source', key: 'data_source' },
+  { label: 'Tele Caller Name', key: 'tele_caller_name' },
+  { label: 'Requirement Summary', key: 'requirement_summary' },
+  { label: 'Site Visit Scheduled', key: 'site_visit_scheduled' },
+  { label: 'Site Visit Done', key: 'site_visit_done' },
+  { label: 'Feedback', key: 'feedback' },
+  { label: 'Attended / Handled by', key: 'attended_by' },
 ];
+const REQUIRED_IMPORT_KEYS = ['lead_name', 'phone', 'data_source', 'attended_by'];
+const REQUIRED_IMPORT_LABELS = {
+  lead_name: 'Name',
+  phone: 'Phone No.',
+  data_source: 'Data Source',
+  attended_by: 'Attended / Handled by',
+};
+const HEADER_ALIASES = {
+  date: 'date',
+  created_at: 'date',
+  name: 'lead_name',
+  lead_name: 'lead_name',
+  email: 'email',
+  email_id: 'email',
+  phone: 'phone',
+  phone_no: 'phone',
+  phone_number: 'phone',
+  country_code: 'phone_country_code',
+  phone_country_code: 'phone_country_code',
+  data_source: 'data_source',
+  source: 'data_source',
+  source_id: 'data_source',
+  tele_caller_name: 'tele_caller_name',
+  telecaller_name: 'tele_caller_name',
+  requirement_summary: 'requirement_summary',
+  requirements: 'requirement_summary',
+  site_visit_scheduled: 'site_visit_scheduled',
+  site_visit_done: 'site_visit_done',
+  feedback: 'feedback',
+  feed_back: 'feedback',
+  attended_handled_by: 'attended_by',
+  attended_by: 'attended_by',
+  handled_by: 'attended_by',
+  assigned_to: 'attended_by',
+};
 
 function csvEscape(value) {
   const text = String(value ?? '');
@@ -72,7 +117,19 @@ function parseCsv(text) {
 }
 
 function normalizeHeader(header) {
-  return header.trim().toLowerCase().replace(/\s+/g, '_');
+  return header.trim().toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function canonicalHeader(header) {
+  return HEADER_ALIASES[normalizeHeader(header)] || normalizeHeader(header);
+}
+
+function parseSheetBoolean(value) {
+  const text = String(value || '').trim().toLowerCase();
+  return ['yes', 'y', 'true', '1', 'done', 'scheduled'].includes(text);
 }
 
 function formatDate(dateStr) {
@@ -298,6 +355,8 @@ function AdminLeadList() {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState('');
+  const [showImportRequirements, setShowImportRequirements] = useState(false);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const session = getSession();
 
@@ -376,11 +435,15 @@ function AdminLeadList() {
   const handleExport = async () => {
     const exportLeads = await filterLeads(getLeadFilters());
     const lines = [
-      IMPORT_EXPORT_FIELDS.join(','),
-      ...exportLeads.map(lead => IMPORT_EXPORT_FIELDS.map(field => {
-        if (field === 'source') return csvEscape(getSourceName(lead.source_id, sources));
-        if (field === 'assigned_to_name') return csvEscape(getUserName(lead.assigned_to, users));
-        return csvEscape(lead[field]);
+      IMPORT_EXPORT_COLUMNS.map(column => column.label).join(','),
+      ...exportLeads.map(lead => IMPORT_EXPORT_COLUMNS.map(column => {
+        if (column.key === 'date') return csvEscape(lead.created_at ? formatDate(lead.created_at) : '');
+        if (column.key === 'data_source') return csvEscape(lead.data_source || getSourceName(lead.source_id, sources));
+        if (column.key === 'attended_by') return csvEscape(getUserName(lead.attended_by || lead.assigned_to, users));
+        if (column.key === 'site_visit_scheduled' || column.key === 'site_visit_done') {
+          return csvEscape(lead[column.key] ? 'Yes' : 'No');
+        }
+        return csvEscape(lead[column.key]);
       }).join(',')),
     ];
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -394,6 +457,16 @@ function AdminLeadList() {
     URL.revokeObjectURL(url);
   };
 
+  const handleImportClick = () => {
+    setShowImportRequirements(true);
+    setShowImportConfirm(true);
+  };
+
+  const handleConfirmImport = () => {
+    setShowImportConfirm(false);
+    importInputRef.current?.click();
+  };
+
   const handleImport = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -403,49 +476,76 @@ function AdminLeadList() {
 
     try {
       const rows = parseCsv(await file.text());
-      const headers = rows[0]?.map(normalizeHeader) || [];
+      const headers = rows[0]?.map(canonicalHeader) || [];
+      const missingHeaders = REQUIRED_IMPORT_KEYS.filter(key => !headers.includes(key));
+      if (missingHeaders.length) {
+        setImportMessage(`Import failed. Missing required columns: ${missingHeaders.map(key => REQUIRED_IMPORT_LABELS[key]).join(', ')}.`);
+        return;
+      }
       const dataRows = rows.slice(1);
-      let imported = 0;
-      let skipped = 0;
+      const importRecords = [];
+      const rowErrors = [];
 
-      for (const row of dataRows) {
+      dataRows.forEach((row, index) => {
         const record = Object.fromEntries(headers.map((header, index) => [header, (row[index] || '').trim()]));
-        const sourceId = record.source_id || sources.find(s =>
-          s.source_name?.toLowerCase() === record.source?.toLowerCase()
+        const cleanPhone = record.phone.replace(/\D/g, '');
+        const sourceId = sources.find(s =>
+          s.id?.toLowerCase() === record.data_source?.toLowerCase()
+          || s.source_name?.toLowerCase() === record.data_source?.toLowerCase()
         )?.id;
-        const assignedTo = record.assigned_to || users.find(u =>
-          u.name?.toLowerCase() === record.assigned_to_name?.toLowerCase()
+        const handledBy = users.find(u =>
+          u.id?.toLowerCase() === record.attended_by?.toLowerCase()
+          || u.email?.toLowerCase() === record.attended_by?.toLowerCase()
+          || u.name?.toLowerCase() === record.attended_by?.toLowerCase()
         )?.id;
 
-        if (!record.lead_name || !record.phone || !sourceId || !assignedTo) {
-          skipped += 1;
-          continue;
+        const missing = [];
+        if (!record.lead_name) missing.push('Name');
+        if (!cleanPhone) missing.push('Phone No.');
+        if (!sourceId) missing.push('Data Source');
+        if (!handledBy) missing.push('Attended / Handled by');
+
+        if (missing.length) {
+          rowErrors.push(`row ${index + 2}: ${missing.join(', ')}`);
+          return;
         }
 
-        await createLead({
+        importRecords.push({
+          date: record.date,
           lead_name: record.lead_name,
-          phone: record.phone,
-          alternate_phone: record.alternate_phone,
+          phone: cleanPhone,
+          phone_country_code: record.phone_country_code,
           email: record.email,
           source_id: sourceId,
-          assigned_to: assignedTo,
-          attended_by: record.attended_by || '',
+          data_source: record.data_source,
+          assigned_to: handledBy,
+          attended_by: handledBy,
+          tele_caller_name: record.tele_caller_name,
+          requirement_summary: record.requirement_summary,
+          site_visit_scheduled: parseSheetBoolean(record.site_visit_scheduled),
+          site_visit_done: parseSheetBoolean(record.site_visit_done),
+          feedback: record.feedback,
           status: record.status || 'new',
-          budget: record.budget,
-          preferred_location: record.preferred_location,
-          property_type: record.property_type,
-          bhk: record.bhk,
-          notes: record.notes,
-          referrer_name: record.referrer_name,
-          referrer_phone: record.referrer_phone,
-        }, session.userId);
-        imported += 1;
+          notes: record.requirement_summary,
+        });
+      });
+
+      if (rowErrors.length) {
+        setImportMessage(`Import failed. Fix ${rowErrors.slice(0, 5).join('; ')}${rowErrors.length > 5 ? ` and ${rowErrors.length - 5} more` : ''}.`);
+        return;
       }
 
-      setImportMessage(`Imported ${imported} lead${imported !== 1 ? 's' : ''}${skipped ? `, skipped ${skipped} row${skipped !== 1 ? 's' : ''}` : ''}.`);
+      if (!importRecords.length) {
+        setImportMessage('Import failed. No valid data rows found.');
+        return;
+      }
+
+      const result = await bulkCreateLeads(importRecords, session.userId);
+      const imported = result.imported || importRecords.length;
+      setImportMessage(`Imported ${imported} lead${imported !== 1 ? 's' : ''}.`);
       setRefreshKey(key => key + 1);
-    } catch {
-      setImportMessage('Import failed. Please check the CSV format and try again.');
+    } catch (err) {
+      setImportMessage(err.message || 'Import failed. Please check the CSV format and try again.');
     } finally {
       setImporting(false);
       event.target.value = '';
@@ -468,11 +568,11 @@ function AdminLeadList() {
           <input
             ref={importInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,text/csv,application/vnd.ms-excel"
             onChange={handleImport}
             style={{ display: 'none' }}
           />
-          <button className="btn btn-secondary" onClick={() => importInputRef.current?.click()} disabled={importing}>
+          <button className="btn btn-secondary" onClick={handleImportClick} disabled={importing}>
             <Upload size={16} /> {importing ? 'Importing...' : 'Import'}
           </button>
           <button className="btn btn-secondary" onClick={handleExport} disabled={loading || importing}>
@@ -489,6 +589,22 @@ function AdminLeadList() {
           {importMessage}
         </div>
       )}
+
+      {showImportRequirements && (
+        <div style={{ marginBottom: 'var(--space-3)', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>
+          Import sheet required columns: Name, Phone No., Data Source, Attended / Handled by.
+          Optional columns: Date, Email Id, Country Code, Tele Caller Name, Requirement Summary, Site Visit Scheduled, Site Visit Done, Feedback.
+        </div>
+      )}
+
+      <ConfirmDialog
+        isOpen={showImportConfirm}
+        onClose={() => setShowImportConfirm(false)}
+        onConfirm={handleConfirmImport}
+        title="Confirm Import"
+        message="Your CSV must include Name, Phone No., Data Source, and Attended / Handled by for every row. Missing required columns or values will reject the import."
+        confirmText="Choose CSV"
+      />
 
       {/* Search & Filters */}
       <div className="filter-bar">

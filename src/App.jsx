@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getSession } from './services/authService';
 import LoginPage from './components/LoginPage';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import LeadList from './pages/LeadList';
-import LeadCreate from './pages/LeadCreate';
-import LeadDetail from './pages/LeadDetail';
-import WalkInLog from './pages/WalkInLog';
-import UserManagement from './pages/UserManagement';
+import { PageLoader } from './components/Skeleton';
+
+// Lazy load page components for code splitting and faster initial load
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const LeadList = lazy(() => import('./pages/LeadList'));
+const LeadCreate = lazy(() => import('./pages/LeadCreate'));
+const LeadDetail = lazy(() => import('./pages/LeadDetail'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
 
 function ProtectedRoute({ children, allowedRoles }) {
   const session = getSession();
@@ -31,6 +33,12 @@ function DefaultRedirect() {
 export default function App() {
   const [session, setSession] = useState(getSession());
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = localStorage.getItem('space-link-theme') === 'amoled'
+      ? 'amoled'
+      : 'light';
+  }, []);
+
   const handleLogin = (s) => {
     setSession(s);
   };
@@ -46,13 +54,12 @@ export default function App() {
           <ProtectedRoute><Layout /></ProtectedRoute>
         }>
           <Route path="/" element={<DefaultRedirect />} />
-          <Route path="/leads" element={<LeadList />} />
-          <Route path="/leads/new" element={<LeadCreate />} />
-          <Route path="/leads/:id" element={<LeadDetail />} />
-          <Route path="/walkins" element={<WalkInLog />} />
+          <Route path="/leads" element={<Suspense fallback={<PageLoader />}><LeadList /></Suspense>} />
+          <Route path="/leads/new" element={<Suspense fallback={<PageLoader />}><LeadCreate /></Suspense>} />
+          <Route path="/leads/:id" element={<Suspense fallback={<PageLoader />}><LeadDetail /></Suspense>} />
           <Route path="/users" element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <UserManagement />
+              <Suspense fallback={<PageLoader />}><UserManagement /></Suspense>
             </ProtectedRoute>
           } />
         </Route>
