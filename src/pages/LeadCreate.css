@@ -40,3 +40,24 @@
   .lead-form-grid { grid-template-columns: 1fr; }
   .form-actions-sticky { position: static; flex-direction: row; }
 }
+
+/* ── Sheet mode ── */
+.page--in-sheet {
+  padding: 0;
+  min-height: unset;
+  background: transparent;
+}
+
+.page--in-sheet .lead-form {
+  padding: var(--space-4) var(--space-4) 0;
+}
+
+.page--in-sheet .form-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-bg-elevated);
+  padding: var(--space-4);
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+  z-index: 10;
+}

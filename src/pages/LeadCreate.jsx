@@ -21,7 +21,7 @@ const today = () => {
 };
 const currentTime = () => new Date().toTimeString().slice(0, 5);
 
-export default function LeadCreate() {
+export default function LeadCreate({ inSheet = false, onSuccess } = {}) {
   const navigate = useNavigate();
   const session = getSession();
 
@@ -192,7 +192,7 @@ export default function LeadCreate() {
         }, session.userId);
       }
 
-      navigate(`/leads/${newLead.id}`);
+      if (onSuccess) { onSuccess(); } else { navigate(`/leads/${newLead.id}`); }
     } catch (err) {
       console.error('Failed to create lead:', err);
       setSaving(false);
@@ -205,7 +205,8 @@ export default function LeadCreate() {
   };
 
   return (
-    <div className="page">
+    <div className={`page${inSheet ? ' page--in-sheet' : ''}`}>
+      {!inSheet && (
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button className="btn btn-ghost btn-icon" onClick={() => navigate(-1)}>
@@ -217,6 +218,7 @@ export default function LeadCreate() {
           </div>
         </div>
       </div>
+      )}
 
       {showDuplicateWarning && (
         <div className="duplicate-warning">
