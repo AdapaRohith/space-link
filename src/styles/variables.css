@@ -120,6 +120,12 @@
   --z-modal-overlay: 200;
   --z-modal:         210;
   --z-toast:         300;
+
+  /* ── Mobile ── */
+  --mobile-header-height: 56px;
+  --mobile-nav-height:    64px;
+  --z-bottom-nav:         90;
+  --z-bottom-sheet:       200;
 }
 
 :root[data-theme="amoled"] {
