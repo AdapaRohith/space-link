@@ -16,3 +16,13 @@
     min-height: 44px;
   }
 }
+
+/* ── Momentum scrolling on scroll containers ── */
+@media (max-width: 768px) {
+  .main-content,
+  .bsheet-body,
+  .mls-container,
+  .sidebar-nav {
+    -webkit-overflow-scrolling: touch;
+  }
+}
