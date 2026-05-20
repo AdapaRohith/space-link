@@ -79,10 +79,12 @@ export default function LeadCreate({ inSheet = false, onSuccess } = {}) {
         const dupes = await checkDuplicate(phone, alternatePhone);
         if (cancelled) return;
         if (dupes.length > 0) {
-          navigate(`/leads/${dupes[0].id}`, {
-            replace: true,
-            state: { openEdit: true, duplicatePhone: phone || alternatePhone },
-          });
+          if (inSheet) { onSuccess?.(); } else {
+            navigate(`/leads/${dupes[0].id}`, {
+              replace: true,
+              state: { openEdit: true, duplicatePhone: phone || alternatePhone },
+            });
+          }
           return;
         }
         setDuplicates(dupes);
@@ -135,10 +137,12 @@ export default function LeadCreate({ inSheet = false, onSuccess } = {}) {
     if (phone.length >= 10 || alternatePhone.length >= 10) {
       const dupes = await checkDuplicate(phone, alternatePhone);
       if (dupes.length > 0) {
-        navigate(`/leads/${dupes[0].id}`, {
-          replace: true,
-          state: { openEdit: true, duplicatePhone: phone || alternatePhone },
-        });
+        if (inSheet) { onSuccess?.(); } else {
+          navigate(`/leads/${dupes[0].id}`, {
+            replace: true,
+            state: { openEdit: true, duplicatePhone: phone || alternatePhone },
+          });
+        }
         return;
       }
     }
@@ -448,7 +452,7 @@ export default function LeadCreate({ inSheet = false, onSuccess } = {}) {
             </div>
 
             <div className="form-actions-sticky">
-              <button type="button" className="btn btn-secondary w-full" onClick={() => navigate(-1)}>
+              <button type="button" className="btn btn-secondary w-full" onClick={() => inSheet ? onSuccess?.() : navigate(-1)}>
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary w-full" disabled={saving}>
