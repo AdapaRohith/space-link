@@ -178,3 +178,23 @@
   color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
 }
+
+/* ── Mobile lead stack layout ── */
+@media (max-width: 768px) {
+  .leads-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - var(--mobile-header-height) - var(--mobile-nav-height) - env(safe-area-inset-bottom));
+    overflow: hidden;
+  }
+
+  .leads-page .page-header {
+    position: sticky;
+    top: var(--mobile-header-height);
+    background: var(--color-bg);
+    z-index: 5;
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-3);
+    flex-shrink: 0;
+  }
+}

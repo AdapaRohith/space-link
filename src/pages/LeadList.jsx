@@ -9,6 +9,7 @@ import { getAllUsers, getUserName, getSession } from '../services/authService';
 import StatusBadge from '../components/StatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Modal from '../components/Modal';
+import MobileLeadStack from '../components/MobileLeadStack';
 import { LEAD_STATUSES } from '../data/seedData';
 import './LeadList.css';
 
@@ -441,6 +442,12 @@ function SalesSearchView() {
   const [loading, setLoading] = useState(false);
   const [sources, setSources] = useState([]);
   const [users, setUsers] = useState([]);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     async function loadRef() {
@@ -476,7 +483,7 @@ function SalesSearchView() {
   }, [query]);
 
   return (
-    <div className="page">
+    <div className="page leads-page">
       {/* Header */}
       <div className="page-header">
         <div>
@@ -526,6 +533,9 @@ function SalesSearchView() {
       )}
 
       {!loading && searched && results.length > 0 && (
+        isMobile ? (
+          <MobileLeadStack leads={results} onRefresh={() => {}} />
+        ) : (
         <div key={query} className="results-appear">
           <div className="sales-results-header">
             <span className="sales-results-count">
@@ -572,6 +582,7 @@ function SalesSearchView() {
             </table>
           </div>
         </div>
+        )
       )}
 
       {/* Hero section — shown when no search is active */}
@@ -662,6 +673,12 @@ function AdminLeadList() {
   const [recentImportedLeads, setRecentImportedLeads] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const session = getSession();
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Load reference data once
   useEffect(() => {
@@ -976,7 +993,7 @@ function AdminLeadList() {
   };
 
   return (
-    <div className="page">
+    <div className="page leads-page">
       {/* Header */}
       <div className="page-header">
         <div>
@@ -1152,6 +1169,9 @@ function AdminLeadList() {
 
       {/* Table */}
       {canShowLeads && paginatedLeads.length > 0 ? (
+        isMobile ? (
+          <MobileLeadStack leads={leads} onRefresh={() => setRefreshKey(k => k + 1)} />
+        ) : (
         <div key={search + sourceFilter + statusFilter} className="results-appear">
           <div className="table-container">
             <table className="table">
@@ -1221,6 +1241,7 @@ function AdminLeadList() {
             </div>
           )}
         </div>
+        )
       ) : canShowLeads ? (
         <div className="empty-state">
           <div className="empty-state-icon"><UserPlus size={28} /></div>
