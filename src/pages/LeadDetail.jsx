@@ -174,7 +174,7 @@ export default function LeadDetail() {
   const whatsappUrl = getWhatsAppUrl(lead.phone);
 
   return (
-    <div className="page">
+    <div className="page lead-detail-page">
       {/* Header */}
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -444,6 +444,32 @@ export default function LeadDetail() {
             placeholder="Add a note about this lead..." rows={5} autoFocus />
         </div>
       </Modal>
+
+      {/* Mobile floating actions */}
+      <div className="detail-mobile-fab-bar">
+        {lead.phone && (
+          <a
+            href={`tel:${lead.phone}`}
+            className="detail-fab detail-fab-call"
+            aria-label="Call lead"
+          >
+            <Phone size={20} />
+            <span>Call</span>
+          </a>
+        )}
+        {whatsappUrl && (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="detail-fab detail-fab-wa"
+            aria-label="WhatsApp"
+          >
+            <MessageCircle size={20} />
+            <span>WhatsApp</span>
+          </a>
+        )}
+      </div>
 
       {/* Delete Confirm */}
       <ConfirmDialog
