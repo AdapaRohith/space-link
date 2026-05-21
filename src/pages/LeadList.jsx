@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Search, Plus, X, Download, Upload, ChevronLeft, ChevronRight, UserPlus, User, Phone
+  Search, Plus, X, Download, Upload, ChevronLeft, ChevronRight, UserPlus, User, Phone, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import { bulkCreateLeads, checkDuplicate, filterLeads } from '../services/leadService';
 import { addCustomSource, getAllSources, getSourceName } from '../services/sourceService';
@@ -660,6 +660,7 @@ function AdminLeadList() {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState('');
+  const [importError, setImportError] = useState(null);
   const [showImportRequirements, setShowImportRequirements] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -827,23 +828,24 @@ function AdminLeadList() {
 
     setImporting(true);
     setImportMessage('');
+    setImportError(null);
 
     try {
       const rows = isXlsxFile(file) ? await parseXlsx(file) : parseCsv(await file.text());
       if (!rows.length) {
-        setImportMessage('Import failed. The sheet is empty.');
+        setImportError({ type: 'fatal', headline: 'Import Failed', summary: 'The file is empty or contains no data rows.', rowErrors: [], showFormat: true });
         return;
       }
 
       const { headers, duplicates: duplicateHeaders } = buildHeaders(rows[0] || []);
       if (duplicateHeaders.length) {
-        setImportMessage(`Import failed. Duplicate column headers: ${duplicateHeaders.map(key => REQUIRED_IMPORT_LABELS[key] || key).join(', ')}.`);
+        setImportError({ type: 'fatal', headline: 'Import Failed — Duplicate Columns', summary: `Your sheet has duplicate column headers: ${duplicateHeaders.map(key => REQUIRED_IMPORT_LABELS[key] || key).join(', ')}.`, rowErrors: [], showFormat: true });
         return;
       }
 
       const missingHeaders = REQUIRED_IMPORT_KEYS.filter(key => !headers.includes(key));
       if (missingHeaders.length) {
-        setImportMessage(`Import failed. Missing required columns: ${missingHeaders.map(key => REQUIRED_IMPORT_LABELS[key]).join(', ')}.`);
+        setImportError({ type: 'fatal', headline: 'Import Failed — Missing Required Columns', summary: `Your sheet is missing: ${missingHeaders.map(key => REQUIRED_IMPORT_LABELS[key]).join(', ')}.`, rowErrors: [], showFormat: true });
         return;
       }
       const dataRows = rows.slice(1);
@@ -925,7 +927,7 @@ function AdminLeadList() {
       }
 
       if (!importRecords.length) {
-        setImportMessage(`Import failed. No valid data rows found.${rowErrors.length ? ` Skipped ${rowErrors.slice(0, 5).join('; ')}${rowErrors.length > 5 ? ` and ${rowErrors.length - 5} more` : ''}.` : ''}`);
+        setImportError({ type: 'fatal', headline: 'Import Failed — No Valid Rows', summary: 'No valid data rows were found in your file.', rowErrors, showFormat: false });
         return;
       }
 
@@ -946,7 +948,7 @@ function AdminLeadList() {
       importRecords = dedupedRecords;
 
       if (!importRecords.length) {
-        setImportMessage(`Import failed. No new valid leads to import. Skipped ${rowErrors.slice(0, 5).join('; ')}${rowErrors.length > 5 ? ` and ${rowErrors.length - 5} more` : ''}.`);
+        setImportError({ type: 'fatal', headline: 'Import Failed — All Duplicates', summary: 'All rows already exist in the system.', rowErrors, showFormat: false });
         return;
       }
 
@@ -977,19 +979,17 @@ function AdminLeadList() {
       setAssigneeFilter('');
       setDateFrom('');
       setDateTo('');
-      setImportMessage(
-        `Imported ${imported} lead${imported !== 1 ? 's' : ''}.`
-        + (rowErrors.length
-          ? ` Skipped ${rowErrors.length} row${rowErrors.length !== 1 ? 's' : ''}: ${rowErrors.slice(0, 5).join('; ')}${rowErrors.length > 5 ? ` and ${rowErrors.length - 5} more` : ''}.`
-          : '')
-        + ' Showing imported leads below.'
-      );
+      if (rowErrors.length) {
+        setImportError({ type: 'partial', headline: `Imported ${imported} of ${imported + rowErrors.length} lead${(imported + rowErrors.length) !== 1 ? 's' : ''}`, summary: `${imported} lead${imported !== 1 ? 's' : ''} imported. ${rowErrors.length} row${rowErrors.length !== 1 ? 's' : ''} were skipped due to errors.`, rowErrors, showFormat: false });
+      } else {
+        setImportMessage(`Imported ${imported} lead${imported !== 1 ? 's' : ''}. Showing imported leads below.`);
+      }
       try {
         setSources(await getAllSources());
       } catch {}
       setRefreshKey(key => key + 1);
     } catch (err) {
-      setImportMessage(err.message || 'Import failed. Please check the CSV format and try again.');
+      setImportError({ type: 'fatal', headline: 'Import Failed', summary: err.message || 'Please check the file format and try again.', rowErrors: [], showFormat: false });
     } finally {
       setImporting(false);
       event.target.value = '';
@@ -1029,8 +1029,85 @@ function AdminLeadList() {
       </div>
 
       {importMessage && (
-        <div className="form-error" style={{ marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
+        <div className="import-success-bar">
+          <CheckCircle2 size={15} />
           {importMessage}
+        </div>
+      )}
+
+      {importError && (
+        <div className="modal-overlay" onClick={() => setImportError(null)}>
+          <div className={`import-error-modal${importError.type === 'partial' ? ' import-error-modal--partial' : ''}`} onClick={e => e.stopPropagation()}>
+            <div className="import-error-header">
+              <div className="import-error-header-left">
+                <AlertTriangle size={20} />
+                <h3>{importError.headline}</h3>
+              </div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setImportError(null)} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="import-error-body">
+              <p className="import-error-summary">{importError.summary}</p>
+
+              {importError.rowErrors.length > 0 && (
+                <div className="import-error-list-section">
+                  <p className="import-error-list-label">
+                    {importError.rowErrors.length} row{importError.rowErrors.length !== 1 ? 's' : ''} had issues:
+                  </p>
+                  <ul className="import-error-list">
+                    {importError.rowErrors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="import-format-section">
+                <p className="import-format-label">Expected spreadsheet format:</p>
+                <div className="import-format-table-wrap">
+                  <table className="import-format-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th className="col-required">Name <span>*</span></th>
+                        <th className="col-required">Phone No. <span>*</span></th>
+                        <th className="col-required">Data Source <span>*</span></th>
+                        <th>Email Id</th>
+                        <th>Country Code</th>
+                        <th>Req. Summary</th>
+                        <th>Site Visit Scheduled</th>
+                        <th>Site Visit Done</th>
+                        <th>Feedback</th>
+                        <th className="col-required">Attended / Handled by <span>*</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>01/05/2025</td>
+                        <td>John Doe</td>
+                        <td>9876543210</td>
+                        <td>Facebook</td>
+                        <td>john@example.com</td>
+                        <td>91</td>
+                        <td>3BHK, South area</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                        <td>Interested</td>
+                        <td>Rahul</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="import-format-note"><span>*</span> Required — all other columns are optional.</p>
+              </div>
+            </div>
+
+            <div className="import-error-footer">
+              <button className="btn btn-primary" onClick={() => setImportError(null)}>Got it</button>
+            </div>
+          </div>
         </div>
       )}
 
