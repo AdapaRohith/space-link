@@ -1,7 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import './App.css';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { getSession } from './services/authService';
+import { getSession, logout } from './services/authService';
 import LoginPage from './components/LoginPage';
 import Layout from './components/Layout';
 import { PageLoader } from './components/Skeleton';
@@ -38,6 +38,15 @@ export default function App() {
     document.documentElement.dataset.theme = localStorage.getItem('space-link-theme') === 'amoled'
       ? 'amoled'
       : 'light';
+  }, []);
+
+  useEffect(() => {
+    const handleExpired = () => {
+      logout();
+      setSession(null);
+    };
+    window.addEventListener('session-expired', handleExpired);
+    return () => window.removeEventListener('session-expired', handleExpired);
   }, []);
 
   const handleLogin = (s) => {

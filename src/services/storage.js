@@ -12,6 +12,9 @@ async function request(path, options = {}) {
     config.body = JSON.stringify(config.body);
   }
   const res = await fetch(url, config);
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent('session-expired'));
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     const detail = typeof err.detail === 'string' ? err.detail : err.detail?.message;
