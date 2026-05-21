@@ -964,7 +964,11 @@ function AdminLeadList() {
 
       const result = await bulkCreateLeads(importRecords, session.userId);
       const imported = result.imported || importRecords.length;
-      const importedLeads = Array.isArray(result.leads) ? result.leads : [];
+      let importedLeads = Array.isArray(result.leads) ? result.leads : [];
+      if (!importedLeads.length && imported > 0) {
+        const today = new Date().toISOString().slice(0, 10);
+        try { importedLeads = await filterLeads({ date_from: today, date_to: today }) || []; } catch {}
+      }
       setRecentImportedLeads(importedLeads);
       setLeads(importedLeads);
       setSearch('');
