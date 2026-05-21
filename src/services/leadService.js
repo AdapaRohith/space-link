@@ -88,26 +88,7 @@ export async function filterLeads(filters) {
 
   const primaryPromise = apiGet(`/leads${qs ? '?' + qs : ''}`);
 
-  // Fan out SLILG only when there's a search term (or admin loading all)
-  const shouldFanOut = filters.search || session?.role === 'admin';
-
-  if (!shouldFanOut) {
-    return await primaryPromise;
-  }
-
-  const [primaryResult, slilgResult] = await Promise.allSettled([
-    primaryPromise,
-    filters.search
-      ? slilgSearchLeads(filters.search)
-      : slilgGetAllLeads(),
-  ]);
-
-  const primary = primaryResult.status === 'fulfilled'
-    ? (Array.isArray(primaryResult.value) ? primaryResult.value : [])
-    : [];
-  const slilg = slilgResult.status === 'fulfilled' ? slilgResult.value : [];
-
-  return mergeLeads(primary, slilg);
+  return await primaryPromise;
 }
 
 export async function checkDuplicate(phone, alternatePhone, excludeId = null) {
